@@ -1,0 +1,115 @@
+/* ============================================================
+ * 设计令牌 (Design Tokens) · 唯一来源
+ * 全部数值 1:1 来自《设计系统》v1.0，业务代码只引用变量，不写死颜色/间距。
+ * ============================================================ */
+
+:root {
+  /* ---------- 主色 · 政务蓝 ---------- */
+  --color-primary: #1D5A99;         /* 品牌 / 主操作 */
+  --color-primary-deep: #16436F;    /* 按下 / 深底 */
+  --color-primary-hover: #17497F;   /* hover */
+  --color-primary-tint: #E7EEF6;    /* 选中底纹 / tint */
+
+  /* ---------- 辅色 ---------- */
+  --color-secondary-teal: #2E7E93;  /* 辅色 青蓝 · 次级图表 / 链接强调 */
+  --color-secondary-steel: #5A7189; /* 辅色 钢灰蓝 · 次要信息 / 分组 */
+
+  /* ---------- 深色表面色 · 侧栏 / 深色区块 ---------- */
+  --color-surface-dark: #16436F;        /* 侧栏 / 深色区块背景 */
+  --color-surface-accent: #5FA8D3;      /* Logo / 选中色条 */
+  --color-surface-fg-strong: #FFFFFF;   /* 当前项 / 标题 反白主文字 */
+  --color-surface-fg: #C7D6E4;          /* 常规导航项 反白次文字 */
+  --color-surface-fg-weak: #8FAAC4;     /* 未激活 / 脚注 反白弱文字 */
+  --color-surface-fg-footer: #7E9AB4;   /* 侧栏页脚文字 */
+  --color-surface-line: rgba(255, 255, 255, 0.08); /* 表面分隔线 8% 白 */
+  --color-surface-active-bg: rgba(95, 168, 211, 0.16); /* 选中项底纹 16% 浅蓝 */
+  --color-surface-hover-bg: rgba(95, 168, 211, 0.08); /* 悬浮底纹 8% 浅蓝 */
+
+  /* ---------- 中性灰阶 ---------- */
+  --color-neutral-100: #F5F7FA;  /* 表头 / 悬浮底纹 */
+  --color-neutral-200: #EAEEF3;  /* 次级分隔 / 骨架条 */
+  --color-neutral-300: #D8DEE6;  /* 常规描边分隔 */
+  --color-neutral-400: #BCC5D0;  /* 空态图标 */
+  --color-neutral-500: #97A3B0;  /* 占位 / 禁用 */
+  --color-neutral-600: #6E7C8B;  /* 次级文本 */
+  --color-neutral-700: #4C5A68;  /* 三级文本 */
+  --color-neutral-800: #313C48;
+  --color-neutral-900: #1C2733;  /* 页面主文本 */
+
+  /* ---------- 页面基础 ---------- */
+  --color-bg: #EEF1F5;           /* 页面底色 */
+  --color-panel: #FFFFFF;        /* 卡片 / 面板底面 */
+  --color-text: #1C2733;         /* 正文主色 */
+  --color-text-sub: #5A6B7B;     /* 正文次色（说明） */
+  --color-text-inverse: #FFFFFF; /* 反白文字（主色底 / 深色底 / 徽章） */
+  --color-selection: rgba(29, 90, 153, 0.16); /* 文本选中底色 = 主色 16% */
+
+  /* ---------- 风险等级 ---------- */
+  --color-risk-high: #C0392B;        --color-risk-high-text: #8E2A20;   --color-risk-high-tint: #F8E8E6;
+  --color-risk-mid: #D98A24;         --color-risk-mid-text: #985E12;    --color-risk-mid-tint: #FBF0DE;
+  --color-risk-low: #C9A227;         --color-risk-low-text: #7F660F;    --color-risk-low-tint: #F7F1DA;
+
+  /* ---------- 处置状态 ---------- */
+  --color-status-normal: #2E8757;    --color-status-normal-text: #1F6340; --color-status-normal-tint: #E4F1EA;
+  --color-status-pending: #C77A1B;   --color-status-pending-text: #8E560F; --color-status-pending-tint: #FAEEDD;
+  --color-status-done: #6E7C8B;      --color-status-done-text: #4C5A68;   --color-status-done-tint: #EBEEF2;
+
+  /* ---------- 语义 · 提示 ---------- */
+  --color-success: #2E8757;      /* 成功 toast */
+  --color-danger: #C0392B;       /* 错误 / 校验失败 / 危险操作 */
+
+  /* ---------- 图表配色序列 · 8 色（首色为政务蓝） ---------- */
+  --chart-1: #1D5A99;  /* 政务蓝 */
+  --chart-2: #2E8DA6;  /* 青 */
+  --chart-3: #5FA8D3;  /* 浅蓝 */
+  --chart-4: #4E9D6B;  /* 绿 */
+  --chart-5: #C9A227;  /* 金 */
+  --chart-6: #D97B3F;  /* 橙 */
+  --chart-7: #B0574E;  /* 砖红 */
+  --chart-8: #7A6FA6;  /* 紫 */
+
+  /* ---------- 字体栈（仅系统字体，无任何 Web 字体） ---------- */
+  --font-sans: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Source Han Sans SC", "Noto Sans SC", system-ui, sans-serif;
+  --font-serif: "Source Han Serif SC", "宋体", SimSun, serif; /* 少量:正式落款 / 文号 */
+
+  /* ---------- 字号 / 字重 / 行高 ---------- */
+  --fs-h1: 22px;   --fw-h1: 600;  --lh-h1: 1.4;   /* 页面主标题 */
+  --fs-h2: 18px;   --fw-h2: 600;  --lh-h2: 1.4;   /* 区块标题 */
+  --fs-h3: 16px;   --fw-h3: 500;  --lh-h3: 1.5;   /* 面板/卡片标题 */
+  --fs-body: 14px; --fw-body: 400; --lh-body: 1.6; /* 正文 */
+  --fs-aux: 13px;  --lh-aux: 1.6;                  /* 辅助说明 */
+  --fs-label: 12px; --fw-label: 500;               /* 标签 / 表头 */
+  --fs-metric: 32px; --fw-metric: 600; --lh-metric: 1.2; /* 指标大数字 */
+  --fw-regular: 400;   /* 通用字重 */
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* ---------- 间距刻度 · 4px 基数 ---------- */
+  --space-1: 4px;   /* 图标与文字间 */
+  --space-2: 8px;   /* 紧凑内边距 */
+  --space-3: 12px;  /* 控件内边距 */
+  --space-4: 16px;  /* 卡片内边距 / 卡片间 */
+  --space-6: 24px;  /* 栅格列间距 */
+  --space-8: 32px;  /* 区块间 / 页面外边距 */
+  --space-12: 48px; /* 大区块分隔 */
+
+  /* ---------- 圆角 / 描边 / 阴影 ---------- */
+  --radius-control: 2px;  /* 控件 / 卡片 */
+  --radius-modal: 4px;    /* 弹窗 */
+  --border-line: 1px solid var(--color-neutral-300);   /* 常规分隔 */
+  --border-accent: 1px solid var(--color-primary);     /* 选中 / 强调 */
+  --shadow-sm: 0 1px 2px rgba(28, 39, 51, 0.06);       /* 下拉 */
+  --shadow-md: 0 4px 16px rgba(28, 39, 51, 0.12);      /* 弹窗 */
+  --overlay-mask: rgba(28, 39, 51, 0.5);               /* 弹窗遮罩 */
+
+  /* ---------- 布局 ---------- */
+  --layout-sidebar-w: 210px;       /* 全局侧栏固定宽度（依据「平台侧栏」组件） */
+  --layout-content-max: 1440px;    /* 内容最大宽度 */
+  --grid-columns: 12;              /* 12 列栅格 */
+  --grid-gutter: 24px;             /* 列间距 */
+
+  /* ---------- 动效（克制:淡入/位移为主） ---------- */
+  --motion-fast: 120ms;   /* 淡入 */
+  --motion-mid: 160ms;    /* 状态切换 */
+  --motion-drawer: 200ms; /* 抽屉滑入 */
+}

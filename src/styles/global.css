@@ -1,0 +1,90 @@
+/* ============================================================
+ * 全局基础样式（依赖 tokens.css）
+ * 兼容性:不使用 :has()、容器查询;仅系统字体栈。
+ * ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--color-primary);
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--color-primary-deep);
+}
+
+::selection {
+  background: var(--color-selection);
+}
+
+/* 数字:等宽对齐（表格 / 指标） */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* 骨架屏:1.2s 呼吸式明暗循环（不使用旋转 spinner） */
+@keyframes ds-skeleton {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+.skeleton {
+  background: var(--color-neutral-200);
+  border-radius: var(--radius-control);
+  animation: ds-skeleton 1.2s ease-in-out infinite;
+}
+
+/* 基础按钮（无 UI 库,自绘） */
+.btn {
+  height: 34px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: var(--fs-aux);
+  cursor: pointer;
+  border: 1px solid var(--color-neutral-300);
+  background: var(--color-panel);
+  color: var(--color-neutral-700);
+  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.btn:hover {
+  border-color: var(--color-neutral-400);
+}
+.btn--primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+.btn--primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+}
