@@ -204,8 +204,8 @@ export const httpClient: ApiClient = {
     getEffectivenessAnalysis(query: DecisionQuery): Promise<EffectivenessAnalysis> {
       return get<EffectivenessAnalysis>('/decision/effectiveness', { period: query.period, districtCode: query.districtCode })
     },
-    getTopicAnalysis(query: DecisionQuery, topic: string): Promise<TopicAnalysis> {
-      return get<TopicAnalysis>('/decision/topic', { period: query.period, districtCode: query.districtCode, topic })
+    getTopicAnalysis(query: DecisionQuery): Promise<TopicAnalysis> {
+      return get<TopicAnalysis>('/decision/topic', { period: query.period, districtCode: query.districtCode })
     },
   },
 }

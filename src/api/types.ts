@@ -904,14 +904,7 @@ export interface DecisionFilters {
   districts: FilterOption[]
   /** 默认区县代码 */
   defaultDistrictCode: string
-  /** 专题分析·可选专题 */
-  topics: FilterOption[]
-  /** 默认专题 */
-  defaultTopic: string
 }
-
-/** KPI 卡(带顶部语义色条) */
-export type DecisionKpi = MetricItem & { accent: KpiAccent }
 
 /** 收入分析·预算执行进度 */
 export interface RevenueProgress {
@@ -1244,17 +1237,184 @@ export interface EffectivenessAnalysis {
   bureaus: BureauRow[]
 }
 
-/** 专题分析 */
+/** 专题 tab 项 */
+export interface TopicTab {
+  /** 专题标识 */
+  key: string
+  /** 专题名 */
+  name: string
+  /** 风险数(红色角标) */
+  risk: number
+}
+
+/** 房地产·环节税种明细行 */
+export interface REStageTaxRow {
+  /** 税种名 */
+  name: string
+  /** 应征(万元) */
+  due: number
+  /** 已入库(万元) */
+  paid: number
+}
+
+/** 房地产·环节风险提示 */
+export interface RERisk {
+  /** 风险等级 */
+  level: RiskLevel
+  /** 风险标题 */
+  title: string
+  /** 风险说明 */
+  note: string
+  /** 涉及户数 */
+  count: number
+}
+
+/** 房地产·单个环节节点 */
+export interface REStage {
+  /** 环节名(拿地/开发建设/…) */
+  name: string
+  /** 环节税收(亿元,已格式化) */
+  amount: string
+  /** 涉及税种芯片 */
+  taxes: string[]
+  /** 风险数(右上角标);0 表示无角标 */
+  riskCount: number
+  /** 税种明细 */
+  taxRows: REStageTaxRow[]
+  /** 风险提示 */
+  risks: RERisk[]
+}
+
+/** 房地产·重点项目监控行 */
+export interface REProject {
+  /** 项目名 */
+  name: string
+  /** 开发企业(脱敏) */
+  developer: string
+  /** 当前环节 */
+  stage: string
+  /** 累计网签(亿) */
+  sale: string
+  /** 土增清算进度(百分数) */
+  progress: number
+  /** 累计纳税(万元,已格式化) */
+  tax: string
+  /** 清算风险等级 */
+  risk: RiskLevel
+}
+
+/** 房地产专题 */
+export interface RealEstateTopic {
+  /** 合计结论文案 */
+  headline: string
+  /** 六个环节 */
+  stages: REStage[]
+  /** 重点项目 */
+  projects: REProject[]
+}
+
+/** 建筑安装·项目(用于象限散点与风险清单) */
+export interface ConstructionProject {
+  /** 项目名 */
+  name: string
+  /** 施工企业(脱敏) */
+  corp: string
+  /** 属地 */
+  district: string
+  /** 合同金额(亿元) */
+  amount: number
+  /** 开票进度(百分数) */
+  invoiceProgress: number
+  /** 预缴率(百分数) */
+  prepayRate: number
+}
+
+/** 建筑安装·概览指标 */
+export interface ConstructionStat {
+  label: string
+  value: string
+  unit: string
+  tone: Tone
+}
+
+/** 建筑安装专题 */
+export interface ConstructionTopic {
+  /** 项目全集 */
+  projects: ConstructionProject[]
+  /** 风险区判定:开票进度 > 此值 */
+  riskInvoiceOver: number
+  /** 风险区判定:预缴率 < 此值 */
+  riskPrepayUnder: number
+  /** 概览指标 */
+  stats: ConstructionStat[]
+  /** 说明文案 */
+  note: string
+}
+
+/** 平台经济·商户销售额分档 */
+export interface PlatformBin {
+  /** 区间标签 */
+  label: string
+  /** 平台报送商户数 */
+  reported: number
+  /** 已申报商户数 */
+  declared: number
+}
+
+/** 平台经济·单个平台 */
+export interface PlatformItem {
+  /** 平台名(脱敏) */
+  name: string
+  /** 平台类型 */
+  type: string
+  /** 入驻商户数 */
+  merchants: number
+  /** 风险商户数 */
+  riskCount: number
+  /** 商户申报率(百分数) */
+  rate: number
+  /** 商户销售额分布 */
+  bins: PlatformBin[]
+  /** 未申报商户数 */
+  gapCount: number
+  /** 预估税款(万元) */
+  gapTax: number
+}
+
+/** 平台经济·未申报商户 */
+export interface PlatformMerchant {
+  /** 商户名(脱敏) */
+  name: string
+  /** 经营类目 */
+  category: string
+  /** 平台报送销售额(万元) */
+  sale: number
+  /** 风险等级 */
+  level: RiskLevel
+}
+
+/** 平台经济专题 */
+export interface PlatformTopic {
+  /** 监测概况文案 */
+  headline: string
+  /** 平台列表 */
+  platforms: PlatformItem[]
+  /** 未申报商户 TOP */
+  topMerchants: PlatformMerchant[]
+}
+
+/** 专题分析(三个专题一次性下发,切换 tab 替换整个内容区) */
 export interface TopicAnalysis {
-  /** 当前专题名称 */
-  topicName: string
-  kpis: DecisionKpi[]
-  /** 专题趋势 */
-  trend: SeriesPoint[]
-  /** 专题结构(环形) */
-  structure: TaxTypeStructure
-  /** 专题明细分解 */
-  breakdown: NamedValue[]
+  /** 专题 tab */
+  tabs: TopicTab[]
+  /** 专题口径说明 */
+  scopeNote: string
+  /** 房地产专题 */
+  realEstate: RealEstateTopic
+  /** 建筑安装专题 */
+  construction: ConstructionTopic
+  /** 平台经济专题 */
+  platform: PlatformTopic
 }
 
 /** 决策分析接口分组 */
@@ -1267,8 +1427,8 @@ export interface DecisionApi {
   getTaxSourceAnalysis(query: DecisionQuery): Promise<TaxSourceAnalysis>
   /** 治税成效分析 */
   getEffectivenessAnalysis(query: DecisionQuery): Promise<EffectivenessAnalysis>
-  /** 专题分析(指定专题) */
-  getTopicAnalysis(query: DecisionQuery, topic: string): Promise<TopicAnalysis>
+  /** 专题分析(三个专题一次下发,前端 tab 切换) */
+  getTopicAnalysis(query: DecisionQuery): Promise<TopicAnalysis>
 }
 
 /* ========================================================================

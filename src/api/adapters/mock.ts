@@ -958,14 +958,6 @@ export const mockClient: ApiClient = {
           { value: 'jiangbei', label: '江北新区' },
         ],
         defaultDistrictCode: 'all',
-        topics: [
-          { value: 'realestate', label: '房地产业专题' },
-          { value: 'construction', label: '建筑安装业专题' },
-          { value: 'retail', label: '批发零售业专题' },
-          { value: 'manufacture', label: '制造业专题' },
-          { value: 'service', label: '生活服务业专题' },
-        ],
-        defaultTopic: 'realestate',
       })
     },
 
@@ -1240,41 +1232,180 @@ export const mockClient: ApiClient = {
       })
     },
 
-    getTopicAnalysis(_query: DecisionQuery, topic: string): Promise<TopicAnalysis> {
-      const TOPIC_NAME: Record<string, string> = {
-        realestate: '房地产业专题',
-        construction: '建筑安装业专题',
-        retail: '批发零售业专题',
-        manufacture: '制造业专题',
-        service: '生活服务业专题',
-      }
-      const months = ['2月', '3月', '4月', '5月', '6月', '7月']
-      const values = [1.42, 1.56, 1.38, 1.72, 1.84, 1.96]
+    getTopicAnalysis(_query: DecisionQuery): Promise<TopicAnalysis> {
       return delay({
-        topicName: TOPIC_NAME[topic] || '专题分析',
-        kpis: [
-          { label: '专题税收', value: '1.96', unit: '亿元', accent: 'primary' },
-          { label: '同比增幅', value: '9.8', unit: '%', accent: 'teal' },
-          { label: '涉及税源', value: '1.2', unit: '万户', accent: 'green' },
-          { label: '风险企业', value: '186', unit: '户', accent: 'red' },
+        tabs: [
+          { key: 'realestate', name: '房地产', risk: 46 },
+          { key: 'construction', name: '建筑安装', risk: 23 },
+          { key: 'platform', name: '平台经济', risk: 31 },
         ],
-        trend: months.map((label, i) => ({ label, value: values[i] })),
-        structure: {
-          totalLabel: '1.96亿',
-          segments: [
-            { name: '增值税', pct: 38 },
-            { name: '企业所得税', pct: 24 },
-            { name: '土地增值税', pct: 18 },
-            { name: '契税', pct: 12 },
-            { name: '其他', pct: 8 },
+        scopeNote: '专题口径由税政部门维护 · 每月 5 日更新',
+        realEstate: {
+          headline: '专题税收合计 21.4 亿元 · 占全市 25.8%',
+          stages: [
+            {
+              name: '拿地', amount: '3.2', taxes: ['契税', '耕地占用税', '印花税'], riskCount: 4,
+              taxRows: [
+                { name: '契税', due: 26400, paid: 25100 },
+                { name: '耕地占用税', due: 4800, paid: 4620 },
+                { name: '印花税', due: 920, paid: 905 },
+              ],
+              risks: [
+                { level: 'mid', title: '土地成交价与契税计税依据不符', note: '成交公示价高于申报计税价 5% 以上', count: 3 },
+                { level: 'low', title: '耕地占用税逾期申报', note: '取得用地批文超 30 日未申报', count: 1 },
+              ],
+            },
+            {
+              name: '开发建设', amount: '2.8', taxes: ['增值税预缴', '城建税', '印花税'], riskCount: 7,
+              taxRows: [
+                { name: '增值税(预缴)', due: 18600, paid: 16800 },
+                { name: '城市维护建设税', due: 2230, paid: 2020 },
+                { name: '建安合同印花税', due: 1480, paid: 1390 },
+              ],
+              risks: [
+                { level: 'high', title: '建安发票与工程进度背离', note: '形象进度 70%,取得建安发票仅 41%', count: 4 },
+                { level: 'mid', title: '甲供材未按规定计税', note: '甲供工程计税方式选择异常', count: 3 },
+              ],
+            },
+            {
+              name: '预售', amount: '6.4', taxes: ['增值税预缴', '土增税预征', '企所税预计'], riskCount: 15,
+              taxRows: [
+                { name: '增值税(预缴 3%)', due: 31200, paid: 28400 },
+                { name: '土地增值税(预征)', due: 18700, paid: 15300 },
+                { name: '企业所得税(预计毛利)', due: 14100, paid: 12600 },
+              ],
+              risks: [
+                { level: 'high', title: '预收款未足额预缴增值税', note: '按揭到账与申报预收款差异超 10%', count: 7 },
+                { level: 'high', title: '土增税预征率适用错误', note: '普通住宅与非普通住宅混用预征率', count: 5 },
+                { level: 'mid', title: '诚意金/更名费未并入预收', note: 'POS 流水存在账外收款特征', count: 3 },
+              ],
+            },
+            {
+              name: '现房销售', amount: '4.1', taxes: ['增值税', '土增税清算', '企所税'], riskCount: 12,
+              taxRows: [
+                { name: '增值税', due: 22800, paid: 21500 },
+                { name: '土地增值税(清算)', due: 16400, paid: 12100 },
+                { name: '企业所得税', due: 9800, paid: 9200 },
+              ],
+              risks: [
+                { level: 'high', title: '达到清算条件未申请清算', note: '销售比例超 85% 满 1 年,共 8 个项目', count: 8 },
+                { level: 'mid', title: '车位/储藏室收入未计税', note: '不动产登记与申报面积差异', count: 4 },
+              ],
+            },
+            {
+              name: '持有', amount: '1.9', taxes: ['房产税', '城镇土地使用税'], riskCount: 5,
+              taxRows: [
+                { name: '房产税(自持)', due: 12400, paid: 11200 },
+                { name: '城镇土地使用税', due: 6600, paid: 6400 },
+              ],
+              risks: [{ level: 'mid', title: '自持商业未申报房产税', note: '电力数据显示营业但零申报', count: 5 }],
+            },
+            {
+              name: '转让', amount: '3.0', taxes: ['增值税', '个税', '契税', '土增税'], riskCount: 3,
+              taxRows: [
+                { name: '增值税(二手交易)', due: 13100, paid: 12800 },
+                { name: '个人所得税', due: 8200, paid: 7900 },
+                { name: '契税(受让方)', due: 8700, paid: 8600 },
+              ],
+              risks: [{ level: 'mid', title: '阴阳合同低报成交价', note: '网签价明显低于同小区均价', count: 3 }],
+            },
+          ],
+          projects: [
+            { name: '滨江壹号院', developer: '某房地产开发 *', stage: '现房销售', sale: '18.6', progress: 88, tax: '32,400', risk: 'high' },
+            { name: '云湖上城', developer: '某置业集团 *', stage: '预售', sale: '12.3', progress: 30, tax: '18,700', risk: 'high' },
+            { name: '学府雅苑', developer: '某城建投资 *', stage: '现房销售', sale: '9.8', progress: 62, tax: '15,200', risk: 'mid' },
+            { name: '科创天地(商办)', developer: '某产业发展 *', stage: '持有', sale: '4.2', progress: 15, tax: '6,800', risk: 'mid' },
+            { name: '锦绣家园三期', developer: '某房地产开发 *', stage: '预售', sale: '7.6', progress: 10, tax: '9,300', risk: 'low' },
           ],
         },
-        breakdown: [
-          { name: '开发环节', value: 8600 },
-          { name: '交易环节', value: 5400 },
-          { name: '持有环节', value: 3200 },
-          { name: '中介服务', value: 1800 },
-        ],
+        construction: {
+          riskInvoiceOver: 55,
+          riskPrepayUnder: 1.5,
+          projects: [
+            { name: '市政快速路三标', corp: '某建工集团 *', district: '城东区', amount: 4.8, invoiceProgress: 72, prepayRate: 1.1 },
+            { name: '数据中心机电安装', corp: '某机电安装 *', district: '高新区', amount: 2.6, invoiceProgress: 81, prepayRate: 0.8 },
+            { name: '老旧小区改造二期', corp: '某建设发展 *', district: '老城区', amount: 1.9, invoiceProgress: 64, prepayRate: 2.1 },
+            { name: '产业园厂房总包', corp: '某建筑股份 *', district: '经开区', amount: 5.4, invoiceProgress: 58, prepayRate: 2.2 },
+            { name: '轨交附属工程', corp: '某隧道工程 *', district: '城西区', amount: 6.2, invoiceProgress: 45, prepayRate: 2.4 },
+            { name: '医院住院楼', corp: '某建工集团 *', district: '城南区', amount: 3.1, invoiceProgress: 52, prepayRate: 2.3 },
+            { name: '水环境治理EPC', corp: '某生态环境 *', district: '临港新区', amount: 4.4, invoiceProgress: 38, prepayRate: 2.5 },
+            { name: '学校迁建项目', corp: '某城建投资 *', district: '江北区', amount: 2.2, invoiceProgress: 49, prepayRate: 2.0 },
+            { name: '商业综合体幕墙', corp: '某幕墙装饰 *', district: '城东区', amount: 1.6, invoiceProgress: 86, prepayRate: 0.6 },
+            { name: '物流园道路工程', corp: '某路桥公司 *', district: '经开区', amount: 1.2, invoiceProgress: 68, prepayRate: 1.7 },
+            { name: '棚改安置房四标', corp: '某建筑劳务 *', district: '城北区', amount: 2.8, invoiceProgress: 77, prepayRate: 0.9 },
+            { name: '热力管网改造', corp: '某能源建设 *', district: '湖滨区', amount: 1.4, invoiceProgress: 61, prepayRate: 1.9 },
+            { name: '科研楼精装修', corp: '某装饰工程 *', district: '高新区', amount: 1.1, invoiceProgress: 90, prepayRate: 0.5 },
+            { name: '港区堆场扩建', corp: '某港务工程 *', district: '临港新区', amount: 3.6, invoiceProgress: 74, prepayRate: 1.0 },
+          ],
+          stats: [
+            { label: '在建项目', value: '342', unit: '个', tone: 'default' },
+            { label: '跨区域施工项目', value: '87', unit: '个', tone: 'default' },
+            { label: '预缴到位率', value: '81.4', unit: '%', tone: 'primary' },
+            { label: '风险区项目', value: '23', unit: '个 · 预估欠缴 4,860 万', tone: 'danger' },
+          ],
+          note: '跨区域项目按 2% 预缴口径监控;外埠施工企业 87 个项目中 23 个预缴率低于阈值,已生成风险线索推送属地分局',
+        },
+        platform: {
+          headline: '监测平台 12 家 · 入驻商户 36,420 户',
+          platforms: [
+            {
+              name: '某同城生活平台 *', type: '本地生活', merchants: 14620, rate: 61.2, riskCount: 2140,
+              gapCount: 1846, gapTax: 2130,
+              bins: [
+                { label: '10万以下', reported: 4820, declared: 3980 },
+                { label: '10–50万', reported: 3660, declared: 2610 },
+                { label: '50–120万', reported: 2940, declared: 1490 },
+                { label: '120–300万', reported: 1780, declared: 860 },
+                { label: '300–500万', reported: 980, declared: 620 },
+                { label: '500万以上', reported: 440, declared: 380 },
+              ],
+            },
+            {
+              name: '某电商平台(区域仓)*', type: '电子商务', merchants: 9840, rate: 72.6, riskCount: 986,
+              gapCount: 912, gapTax: 1480,
+              bins: [
+                { label: '10万以下', reported: 2610, declared: 2260 },
+                { label: '10–50万', reported: 2380, declared: 1890 },
+                { label: '50–120万', reported: 2140, declared: 1520 },
+                { label: '120–300万', reported: 1460, declared: 980 },
+                { label: '300–500万', reported: 820, declared: 610 },
+                { label: '500万以上', reported: 430, declared: 380 },
+              ],
+            },
+            {
+              name: '某货运撮合平台 *', type: '网络货运', merchants: 6420, rate: 54.8, riskCount: 1620,
+              gapCount: 1284, gapTax: 1960,
+              bins: [
+                { label: '10万以下', reported: 1240, declared: 860 },
+                { label: '10–50万', reported: 1480, declared: 820 },
+                { label: '50–120万', reported: 1520, declared: 760 },
+                { label: '120–300万', reported: 1180, declared: 540 },
+                { label: '300–500万', reported: 680, declared: 380 },
+                { label: '500万以上', reported: 320, declared: 210 },
+              ],
+            },
+            {
+              name: '某灵活用工平台 *', type: '灵活用工', merchants: 5540, rate: 83.4, riskCount: 412,
+              gapCount: 386, gapTax: 520,
+              bins: [
+                { label: '10万以下', reported: 2210, declared: 2020 },
+                { label: '10–50万', reported: 1480, declared: 1310 },
+                { label: '50–120万', reported: 860, declared: 720 },
+                { label: '120–300万', reported: 540, declared: 420 },
+                { label: '300–500万', reported: 290, declared: 240 },
+                { label: '500万以上', reported: 160, declared: 140 },
+              ],
+            },
+          ],
+          topMerchants: [
+            { name: '某餐饮连锁(11 门店)*', category: '本地生活 · 餐饮', sale: 486, level: 'high' },
+            { name: '某建材经营部 *', category: '电商 · 建材家居', sale: 412, level: 'high' },
+            { name: '某个体运输车队 *', category: '网络货运', sale: 368, level: 'high' },
+            { name: '某服饰直播店 *', category: '电商 · 服饰鞋包', sale: 291, level: 'mid' },
+            { name: '某生鲜配送站 *', category: '本地生活 · 生鲜', sale: 246, level: 'mid' },
+            { name: '某家政服务号 *', category: '灵活用工', sale: 188, level: 'mid' },
+          ],
+        },
       })
     },
   },
