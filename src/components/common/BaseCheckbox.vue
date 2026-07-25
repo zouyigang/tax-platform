@@ -35,7 +35,7 @@ defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
   align-items: center;
   justify-content: center;
   color: var(--color-text-inverse);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1;
   cursor: pointer;
   transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;

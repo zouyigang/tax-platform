@@ -145,13 +145,13 @@ function isLeafActive(key: string) {
   font-size: 15px;
 }
 .sidebar__title {
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 600;
   color: var(--color-surface-fg-strong);
   line-height: 1.25;
 }
 .sidebar__subtitle {
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 400;
   color: var(--color-surface-fg-weak);
 }
@@ -171,7 +171,7 @@ function isLeafActive(key: string) {
   width: 100%;
   height: 40px;
   padding: 0 16px;
-  font-size: 14px;
+  font-size: var(--fs-body);
   cursor: pointer;
   color: var(--color-surface-fg);
   background: transparent;
@@ -233,7 +233,7 @@ function isLeafActive(key: string) {
   gap: 8px;
   height: 34px;
   padding: 0 16px 0 39px; /* 与一级图标列对齐的缩进 */
-  font-size: 13px;
+  font-size: var(--fs-aux);
   color: var(--color-surface-fg-weak);
   text-decoration: none;
   border-left: 3px solid transparent;
@@ -269,7 +269,7 @@ function isLeafActive(key: string) {
 }
 .nav-sub__badge {
   flex: none;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   background: var(--color-risk-high);
   color: var(--color-text-inverse);
   border-radius: 9px;
@@ -286,7 +286,7 @@ function isLeafActive(key: string) {
   flex: none;
   padding: 12px 18px;
   border-top: 1px solid var(--color-surface-line);
-  font-size: 12px;
+  font-size: var(--fs-label);
   color: var(--color-surface-fg-footer);
 }
 </style>
