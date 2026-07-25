@@ -30,7 +30,13 @@ import type {
   DispatchFilters,
   DispatchQuery,
   DispatchRow,
+  EffectMonitor,
   PerformanceStats,
+  ThresholdFilters,
+  ThresholdQuery,
+  ThresholdRow,
+  TrialFilters,
+  TrialRow,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
@@ -808,6 +814,176 @@ export const mockClient: ApiClient = {
     getRuleDetail(id: string): Promise<RuleDetail> {
       const r = RULE_DATA.filter((x) => x.id === id)[0] || RULE_DATA[0]
       return delay(buildRuleDetail(r))
+    },
+  },
+
+  /* ==================== 规则库管理扩展 ==================== */
+  ruleops: {
+    getTrialFilters(): Promise<TrialFilters> {
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        statuses: [
+          { value: 'all', label: '全部状态', count: 8 },
+          { value: 'running', label: '运行中', count: 2 },
+          { value: 'queued', label: '排队中', count: 1 },
+          { value: 'done', label: '已完成', count: 4 },
+          { value: 'failed', label: '失败', count: 1 },
+        ],
+        kpis: [
+          { label: '本月试跑', value: '26', unit: '次', accent: 'primary' },
+          { label: '进行中', value: '3', unit: '个', accent: 'teal' },
+          { label: '灰度发布中', value: '4', unit: '条规则', accent: 'gold' },
+          { label: '试跑转全量率', value: '62.5', unit: '%', accent: 'green' },
+        ],
+      })
+    },
+
+    getTrials(status: string): Promise<TrialRow[]> {
+      // 取规则库前 8 条构造试跑任务,保持与规则配置页数据一致
+      const OPS = ['王××', '李××', '张××', '陈××']
+      const STATUS_CYCLE: TrialRow['status'][] = ['running', 'done', 'done', 'queued', 'done', 'failed', 'running', 'done']
+      const GRAY_CYCLE: TrialRow['gray'][] = ['gray', 'full', 'gray', 'none', 'full', 'none', 'gray', 'gray']
+      const all: TrialRow[] = RULE_DATA.slice(0, 8).map((r, i) => {
+        const st = STATUS_CYCLE[i]
+        const done = st === 'done'
+        return {
+          id: `TR2026-${(3100 + i).toString()}`,
+          ruleId: r.id,
+          ruleName: r.name,
+          scope: i % 2 === 0 ? '全市 · 近 12 个月' : '城东区 · 近 6 个月',
+          status: st,
+          progress: st === 'running' ? [64, 0, 0, 0, 0, 0, 38, 0][i] : done ? 100 : 0,
+          hitCount: done || st === 'running' ? Math.round(r.monthHit * 11.4) : 0,
+          falseRate: done ? +(100 - r.hitRate).toFixed(1) : 0,
+          coverage: done || st === 'running' ? Math.round(r.monthHit * 8.6) : 0,
+          hitDelta: done ? (i % 3 === 0 ? '+18.2%' : i % 3 === 1 ? '-6.4%' : '+9.1%') : '—',
+          gray: GRAY_CYCLE[i],
+          grayPercent: GRAY_CYCLE[i] === 'gray' ? [20, 0, 50, 0, 0, 0, 10, 30][i] : 0,
+          operator: OPS[i % OPS.length],
+          createdAt: `2026-07-${String(24 - i).padStart(2, '0')} 09:${String(10 + i * 6).padStart(2, '0')}`,
+        }
+      })
+      return delay(status === 'all' ? all : all.filter((t) => t.status === status))
+    },
+
+    getThresholdFilters(): Promise<ThresholdFilters> {
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        industries: [
+          { value: 'all', label: '全部行业' },
+          { value: '通用', label: '通用' },
+          { value: '批发零售', label: '批发零售' },
+          { value: '建筑安装', label: '建筑安装' },
+          { value: '制造业', label: '制造业' },
+          { value: '房地产', label: '房地产' },
+        ],
+        changeLogs: [
+          { time: '2026-07-22 15:20', ruleName: '增值税税负率低于预警下限', paramName: '预警下限', from: '2.5', to: '2.2', operator: '李××', reason: '按上级口径下调,减少低风险误报' },
+          { time: '2026-07-18 10:05', ruleName: '发票领用量环比激增', paramName: '环比倍数', from: '2.0', to: '2.5', operator: '王××', reason: '试跑显示 2.0 倍误报率偏高' },
+          { time: '2026-07-15 16:40', ruleName: '企业所得税贡献率偏低', paramName: '观察周期', from: '6', to: '12', operator: '张××', reason: '拉长周期以平抑季节性波动' },
+          { time: '2026-07-09 09:30', ruleName: '关联企业转让定价偏离', paramName: '偏离阈值', from: '15', to: '20', operator: '陈××', reason: '与稽查口径对齐' },
+        ],
+      })
+    },
+
+    getThresholds(query: ThresholdQuery): Promise<PagedResult<ThresholdRow>> {
+      const TIERS: Array<[string, string]> = [
+        ['通用', '一般纳税人'],
+        ['批发零售', '一般纳税人'],
+        ['建筑安装', '一般纳税人'],
+        ['制造业', '一般纳税人'],
+        ['通用', '小规模'],
+      ]
+      const PARAMS: Array<[string, string, string]> = [
+        ['预警上限', '%', '20'],
+        ['预警下限', '%', '3'],
+        ['观察周期', '月', '12'],
+      ]
+      const all: ThresholdRow[] = []
+      RULE_DATA.slice(0, 8).forEach((r, ri) => {
+        PARAMS.forEach((p, pi) => {
+          const tier = TIERS[(ri + pi) % TIERS.length]
+          all.push({
+            id: `TH-${r.id}-${pi}`,
+            ruleId: r.id,
+            ruleName: r.name,
+            paramName: p[0],
+            industry: tier[0],
+            scale: tier[1],
+            value: String(Number(p[2]) + (ri % 3) * (pi === 2 ? 0 : 2)),
+            unit: p[1],
+            updatedAt: `2026-07-${String(10 + ri).padStart(2, '0')}`,
+            updatedBy: ['王××', '李××', '张××', '陈××'][ri % 4],
+          })
+        })
+      })
+      const kw = query.keyword.trim()
+      const filtered = all.filter((t) => {
+        if (kw && t.ruleName.indexOf(kw) < 0 && t.paramName.indexOf(kw) < 0 && t.ruleId.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+        if (query.industry !== 'all' && t.industry !== query.industry) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: filtered.slice(start, start + query.pageSize),
+        total: filtered.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getEffectMonitor(): Promise<EffectMonitor> {
+      const CAT_CN: Record<string, string> = {
+        invoice: '发票类', income: '收入类', cost: '成本费用类', burden: '税负类',
+        benefit: '优惠类', register: '登记类', declare: '申报类', related: '关联交易类',
+        fund: '资金类', other: '其他类',
+      }
+      const factors = [0.62, 0.71, 0.68, 0.83, 0.92, 1]
+      // 结论:查实率 ≥50 有效 / ≥30 待优化 / 其余建议下线(停用与草稿规则不参与)
+      const rules = RULE_DATA.filter((r) => r.status === 'enabled' || r.status === 'testing').map((r) => ({
+        id: r.id,
+        name: r.name,
+        category: CAT_CN[r.categoryCode.split('.')[0]] || r.categoryCode,
+        monthHit: r.monthHit,
+        hitRate: r.hitRate,
+        falseRate: +(100 - r.hitRate).toFixed(1),
+        mom: r.hitRate >= 50 ? '+8.4%' : r.hitRate >= 35 ? '-3.2%' : '-12.6%',
+        spark: factors.map((f) => Math.round(r.monthHit * f)),
+        verdict: (r.hitRate >= 50 ? 'effective' : r.hitRate >= 30 ? 'tuning' : 'retire') as EffectMonitor['rules'][number]['verdict'],
+      }))
+      const byCat: Record<string, number> = {}
+      rules.forEach((r) => {
+        byCat[r.category] = (byCat[r.category] || 0) + r.monthHit
+      })
+      const categoryDist = Object.keys(byCat)
+        .map((name) => ({ name, value: byCat[name] }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 6)
+      const totalHit = rules.reduce((s, r) => s + r.monthHit, 0)
+      const avgRate = rules.length ? rules.reduce((s, r) => s + r.hitRate, 0) / rules.length : 0
+      return delay({
+        kpis: [
+          { label: '在用规则', value: String(rules.length), unit: '条', accent: 'primary' },
+          { label: '本月命中', value: totalHit.toLocaleString('en-US'), unit: '条', accent: 'teal' },
+          { label: '平均查实率', value: avgRate.toFixed(1), unit: '%', accent: 'green' },
+          { label: '建议下线', value: String(rules.filter((r) => r.verdict === 'retire').length), unit: '条', accent: 'red' },
+        ],
+        trend: [
+          { label: '2月', value: 780 },
+          { label: '3月', value: 892 },
+          { label: '4月', value: 856 },
+          { label: '5月', value: 1042 },
+          { label: '6月', value: 1156 },
+          { label: '7月', value: 1248 },
+        ],
+        categoryDist,
+        rules,
+        suggestions: [
+          { title: '误报率持续偏高,建议收紧阈值', ruleName: '登记信息与工商不一致', note: '近 3 个月误报率均高于 78%,建议将比对容差由 5% 收紧至 2%,或增加"变更 30 日内不预警"的排除条件', level: 'high' },
+          { title: '命中量骤降,疑似规则失效', ruleName: '申报表勾稽关系异常', note: '环比下降 12.6%,同期申报量无明显变化,建议核查取数口径是否随申报表改版失效', level: 'mid' },
+          { title: '查实率优秀,建议扩大适用范围', ruleName: '走逃失联疑似企业', note: '查实率 63.4% 居全库首位,建议由重点行业扩展至全行业适用', level: 'low' },
+        ],
+      })
     },
   },
 

@@ -1811,6 +1811,191 @@ export interface RiskMgmtApi {
 }
 
 /* ========================================================================
+ * 十、规则库管理扩展（RuleOps）· 试跑与灰度 / 阈值参数 / 效果监测
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》3.1.6 规则试运行、3.1.4 阈值参数、3.12.3 规则效果评估。
+ * 与「规则配置」页的区别:配置页是单规则视角(定义/阈值/效果三标签),
+ * 本组三页是跨规则视角(试跑队列 / 全库参数审计 / 全库效果横向对比)。
+ * ====================================================================== */
+
+/** 试跑任务状态:排队中 / 运行中 / 已完成 / 失败 */
+export type TrialStatus = 'queued' | 'running' | 'done' | 'failed'
+
+/** 灰度阶段:未灰度 / 灰度中 / 已全量 */
+export type GrayStage = 'none' | 'gray' | 'full'
+
+/** 试跑任务行 */
+export interface TrialRow {
+  /** 试跑任务编号 */
+  id: string
+  /** 规则编号 */
+  ruleId: string
+  /** 规则名称 */
+  ruleName: string
+  /** 样本范围(如「全市 · 近 12 个月」) */
+  scope: string
+  /** 任务状态 */
+  status: TrialStatus
+  /** 进度(百分数;运行中有效) */
+  progress: number
+  /** 命中量(完成后有效) */
+  hitCount: number
+  /** 预估误报率(百分数) */
+  falseRate: number
+  /** 影响面(涉及纳税人户数) */
+  coverage: number
+  /** 与现行版本对比的命中量变化文案(带符号) */
+  hitDelta: string
+  /** 灰度阶段 */
+  gray: GrayStage
+  /** 灰度比例(百分数;gray 阶段有效) */
+  grayPercent: number
+  /** 发起人 */
+  operator: string
+  /** 发起时间 */
+  createdAt: string
+}
+
+/** 试跑筛选项与概览 */
+export interface TrialFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 状态选项(附计数) */
+  statuses: Array<FilterOption & { count: number }>
+  /** 顶部指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 阈值参数·一条分档取值(跨规则集中管理视角) */
+export interface ThresholdRow {
+  /** 参数记录 id */
+  id: string
+  /** 所属规则编号 */
+  ruleId: string
+  /** 所属规则名称 */
+  ruleName: string
+  /** 参数名 */
+  paramName: string
+  /** 适用行业 */
+  industry: string
+  /** 适用纳税人规模 */
+  scale: string
+  /** 当前取值(字符串,便于表单编辑) */
+  value: string
+  /** 单位 */
+  unit: string
+  /** 最近修改时间 */
+  updatedAt: string
+  /** 最近修改人 */
+  updatedBy: string
+}
+
+/** 阈值参数·变更记录 */
+export interface ThresholdChangeLog {
+  /** 变更时间 */
+  time: string
+  /** 规则名称 */
+  ruleName: string
+  /** 参数名 */
+  paramName: string
+  /** 变更前 */
+  from: string
+  /** 变更后 */
+  to: string
+  /** 操作人 */
+  operator: string
+  /** 变更事由 */
+  reason: string
+}
+
+/** 阈值参数·查询参数 */
+export interface ThresholdQuery {
+  /** 规则名 / 参数名关键字 */
+  keyword: string
+  /** 适用行业;'all' 不限 */
+  industry: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 阈值参数·筛选项 */
+export interface ThresholdFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 行业选项(含「全部行业」) */
+  industries: FilterOption[]
+  /** 变更记录(近期) */
+  changeLogs: ThresholdChangeLog[]
+}
+
+/** 效果监测·规则结论:有效 / 待优化 / 建议下线 */
+export type RuleVerdict = 'effective' | 'tuning' | 'retire'
+
+/** 效果监测·规则横向对比行 */
+export interface EffectRuleRow {
+  /** 规则编号 */
+  id: string
+  /** 规则名称 */
+  name: string
+  /** 所属分类 */
+  category: string
+  /** 本月命中量 */
+  monthHit: number
+  /** 查实率(百分数) */
+  hitRate: number
+  /** 误报率(百分数) */
+  falseRate: number
+  /** 环比命中变化文案(带符号) */
+  mom: string
+  /** 近 6 月命中量(用于迷你趋势) */
+  spark: number[]
+  /** 评估结论 */
+  verdict: RuleVerdict
+}
+
+/** 效果监测·优化建议 */
+export interface EffectSuggestion {
+  /** 建议标题 */
+  title: string
+  /** 涉及规则 */
+  ruleName: string
+  /** 建议说明 */
+  note: string
+  /** 紧要程度 */
+  level: RiskLevel
+}
+
+/** 规则效果监测 */
+export interface EffectMonitor {
+  /** 顶部指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+  /** 全库命中量趋势 */
+  trend: SeriesPoint[]
+  /** 分类命中占比 */
+  categoryDist: NamedValue[]
+  /** 规则横向对比 */
+  rules: EffectRuleRow[]
+  /** 优化建议 */
+  suggestions: EffectSuggestion[]
+}
+
+/** 规则库管理扩展接口分组 */
+export interface RuleOpsApi {
+  /** 试跑筛选项与概览 */
+  getTrialFilters(): Promise<TrialFilters>
+  /** 试跑任务列表 */
+  getTrials(status: string): Promise<TrialRow[]>
+  /** 阈值参数筛选项与变更记录 */
+  getThresholdFilters(): Promise<ThresholdFilters>
+  /** 阈值参数列表(分页) */
+  getThresholds(query: ThresholdQuery): Promise<PagedResult<ThresholdRow>>
+  /** 规则效果监测 */
+  getEffectMonitor(): Promise<EffectMonitor>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -1832,4 +2017,6 @@ export interface ApiClient {
   datagov: DataGovApi
   /** 风险管理 · 任务派发 / 结果回填 / 处置绩效 */
   riskmgmt: RiskMgmtApi
+  /** 规则库管理扩展 · 试跑灰度 / 阈值参数 / 效果监测 */
+  ruleops: RuleOpsApi
 }

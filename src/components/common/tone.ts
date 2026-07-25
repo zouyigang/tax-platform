@@ -10,8 +10,10 @@ import type {
   MatchStatus,
   RiskLevel,
   RuleStatus,
+  RuleVerdict,
   SourceStatus,
   Tone,
+  TrialStatus,
 } from '@/api/types'
 
 /** 可用语气名(在 Tone 基础上增加「待派发」专用色) */
@@ -121,4 +123,34 @@ export const BACKFILL_STATUS_LABEL: Record<BackfillStatus, string> = {
   draft: '草稿',
   submitted: '已提交',
   returned: '被退回',
+}
+
+/** 试跑任务状态 → 语气 */
+export const TRIAL_STATUS_TONE: Record<TrialStatus, ToneName> = {
+  queued: 'neutral',
+  running: 'primary',
+  done: 'success',
+  failed: 'danger',
+}
+
+/** 试跑任务状态 → 展示文案 */
+export const TRIAL_STATUS_LABEL: Record<TrialStatus, string> = {
+  queued: '排队中',
+  running: '运行中',
+  done: '已完成',
+  failed: '失败',
+}
+
+/** 规则评估结论 → 语气 */
+export const VERDICT_TONE: Record<RuleVerdict, ToneName> = {
+  effective: 'success',
+  tuning: 'warn',
+  retire: 'danger',
+}
+
+/** 规则评估结论 → 展示文案 */
+export const VERDICT_LABEL: Record<RuleVerdict, string> = {
+  effective: '有效',
+  tuning: '待优化',
+  retire: '建议下线',
 }

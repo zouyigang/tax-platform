@@ -26,7 +26,13 @@ import type {
   DispatchFilters,
   DispatchQuery,
   DispatchRow,
+  EffectMonitor,
   PerformanceStats,
+  ThresholdFilters,
+  ThresholdQuery,
+  ThresholdRow,
+  TrialFilters,
+  TrialRow,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
@@ -275,6 +281,29 @@ export const httpClient: ApiClient = {
     },
     getPerformanceStats(): Promise<PerformanceStats> {
       return get<PerformanceStats>('/risk/performance')
+    },
+  },
+
+  ruleops: {
+    getTrialFilters(): Promise<TrialFilters> {
+      return get<TrialFilters>('/rules/trial/filters')
+    },
+    getTrials(status: string): Promise<TrialRow[]> {
+      return get<TrialRow[]>('/rules/trial', { status })
+    },
+    getThresholdFilters(): Promise<ThresholdFilters> {
+      return get<ThresholdFilters>('/rules/threshold/filters')
+    },
+    getThresholds(query: ThresholdQuery): Promise<PagedResult<ThresholdRow>> {
+      return get<PagedResult<ThresholdRow>>('/rules/threshold', {
+        keyword: query.keyword,
+        industry: query.industry,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getEffectMonitor(): Promise<EffectMonitor> {
+      return get<EffectMonitor>('/rules/effect-monitor')
     },
   },
 }
