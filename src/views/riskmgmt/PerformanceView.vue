@@ -15,19 +15,19 @@ import DataTable from '@/components/common/DataTable.vue'
 import LineChart from '@/components/charts/LineChart.vue'
 import BarChart from '@/components/charts/BarChart.vue'
 import HBarList from '@/components/charts/HBarList.vue'
-import type { TableColumn } from '@/components/common/table'
+import type { SortDir, TableColumn } from '@/components/common/table'
 
 const data = useResource(() => api.riskmgmt.getPerformanceStats())
 const perf = computed(() => data.data.value)
 
 onMounted(() => data.load())
 
-/* 人员绩效排序 */
+/* 人员绩效排序:点击列头切换(首次点击数值列降序,文本列升序) */
 const sortKey = ref<keyof PerfPersonRow>('tax')
-const sortDir = ref(-1)
+const sortDir = ref<SortDir>(-1)
 function sortBy(key: string) {
   const k = key as keyof PerfPersonRow
-  if (sortKey.value === k) sortDir.value = -sortDir.value
+  if (sortKey.value === k) sortDir.value = sortDir.value === 1 ? -1 : 1
   else {
     sortKey.value = k
     sortDir.value = k === 'name' || k === 'dept' ? 1 : -1
@@ -102,7 +102,16 @@ function rateTone(r: number) {
           </div>
 
           <PanelCard title="人员绩效明细" subtitle="点击列头排序">
-            <DataTable :columns="columns" :rows="persons" :row-key="rowKey" density="compact">
+            <DataTable
+              :columns="columns"
+              :rows="persons"
+              :row-key="rowKey"
+              density="compact"
+              sortable
+              :sort-key="sortKey"
+              :sort-dir="sortDir"
+              @sort="sortBy"
+            >
               <template #cell-name="{ row }">
                 <span class="pf__name">{{ row.name }}</span>
               </template>
@@ -121,15 +130,6 @@ function rateTone(r: number) {
                 <span :class="row.momPos ? 'val-pos' : 'val-neg'">{{ row.mom }}</span>
               </template>
             </DataTable>
-            <div class="pf__sorthint">
-              当前排序:<b>{{ columns.filter((c) => c.key === sortKey)[0]?.label ?? '入库税款' }}</b>
-              {{ sortDir === 1 ? '升序' : '降序' }}
-              <span class="pf__sortbtns">
-                <span v-for="c in columns" :key="c.key" class="pf__sortbtn" :class="{ 'pf__sortbtn--on': c.key === sortKey }" @click="sortBy(c.key)">
-                  {{ c.label }}
-                </span>
-              </span>
-            </div>
           </PanelCard>
         </template>
       </StateBlock>
@@ -209,44 +209,4 @@ function rateTone(r: number) {
   font-weight: var(--fw-semibold);
 }
 
-/* 排序控制条 */
-.pf__sorthint {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-neutral-200);
-  font-size: var(--fs-label);
-  color: var(--color-neutral-600);
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-.pf__sorthint b {
-  color: var(--color-neutral-900);
-  font-weight: var(--fw-semibold);
-}
-.pf__sortbtns {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.pf__sortbtn {
-  padding: 2px 10px;
-  border: var(--border-line);
-  border-radius: var(--radius-control);
-  cursor: pointer;
-  color: var(--color-neutral-700);
-  background: var(--color-panel);
-}
-.pf__sortbtn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-.pf__sortbtn--on,
-.pf__sortbtn--on:hover {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--color-text-inverse);
-}
 </style>

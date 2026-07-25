@@ -12,4 +12,12 @@ export interface TableColumn {
   numeric?: boolean
   /** 内容超宽时省略号截断 */
   ellipsis?: boolean
+  /**
+   * 该列是否可排序。仅在表格开启 sortable 时生效;
+   * 不传 = 可排序,显式 false = 该列不可排序(如操作列)。
+   */
+  sortable?: boolean
 }
+
+/** 排序方向:1 升序 / -1 降序 */
+export type SortDir = 1 | -1

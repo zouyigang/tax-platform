@@ -7,7 +7,7 @@
  * - 单元格可通过具名插槽 #cell-<key> 自定义渲染
  */
 import BaseCheckbox from './BaseCheckbox.vue'
-import type { TableColumn } from './table'
+import type { SortDir, TableColumn } from './table'
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +31,12 @@ const props = withDefaults(
     loading?: boolean
     /** 骨架行数 */
     skeletonRows?: number
+    /** 开启点击列头排序(排序本身由父级执行,本组件只负责交互与指示器) */
+    sortable?: boolean
+    /** 当前排序列 key */
+    sortKey?: string
+    /** 当前排序方向 */
+    sortDir?: SortDir
   }>(),
   {
     density: 'normal',
@@ -40,13 +46,28 @@ const props = withDefaults(
     clickable: false,
     loading: false,
     skeletonRows: 8,
+    sortable: false,
+    sortKey: '',
+    sortDir: -1,
   },
 )
 
 const emit = defineEmits<{
   (e: 'row-click', row: T): void
   (e: 'update:selectedKeys', keys: string[]): void
+  (e: 'sort', key: string): void
 }>()
+
+/** 该列是否参与排序(表格开启 + 列未显式关闭) */
+function canSort(c: TableColumn): boolean {
+  return props.sortable && c.sortable !== false
+}
+/** 排序指示器:当前列显示方向箭头,其余列显示可排序提示 */
+function sortIcon(c: TableColumn): string {
+  if (!canSort(c)) return ''
+  if (props.sortKey !== c.key) return '⇅'
+  return props.sortDir === 1 ? '▲' : '▼'
+}
 
 /** 取单元格原始值(泛型行需在此收窄) */
 function cellValue(row: T, key: string): unknown {
@@ -116,9 +137,16 @@ function skeletonWidth(index: number): string {
             v-for="c in columns"
             :key="c.key"
             class="table__th"
+            :class="{ 'table__th--sortable': canSort(c) }"
             :style="{ textAlign: c.align || 'left' }"
+            @click="canSort(c) && emit('sort', c.key)"
           >
             {{ c.label }}
+            <span
+              v-if="canSort(c)"
+              class="num table__sort"
+              :class="{ 'table__sort--on': sortKey === c.key }"
+            >{{ sortIcon(c) }}</span>
           </th>
         </tr>
       </thead>
@@ -199,6 +227,22 @@ function skeletonWidth(index: number): string {
 .table__th--check {
   padding-left: 16px;
   padding-right: 8px;
+}
+/* 可排序列头:指针 + 悬浮主色;排序指示器与决策分析各表一致(▲▼ / ⇅) */
+.table__th--sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.table__th--sortable:hover {
+  color: var(--color-primary);
+}
+.table__sort {
+  font-size: 10px;
+  color: var(--color-neutral-400);
+  margin-left: 2px;
+}
+.table__sort--on {
+  color: var(--color-primary);
 }
 
 .table__row {
