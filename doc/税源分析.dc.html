@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#EEF1F5;color:#1C2733;font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:#1D5A99;text-decoration:none}
+  a:hover{color:#16436F;text-decoration:underline}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+</style>
+</helmet>
+<div data-screen-label="税源分析" style="display:flex;min-height:100vh;background:#EEF1F5;min-width:1280px">
+
+  <nav style="width:210px;flex:none;position:sticky;top:0;height:100vh;background:#16436F;color:#C7D6E4;display:flex;flex-direction:column">
+    <div style="height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.08)">
+      <div style="width:28px;height:28px;background:#5FA8D3;color:#16436F;border-radius:2px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none">税</div>
+      <div style="font-size:14px;font-weight:600;color:#fff;line-height:1.25">智慧综合治税<br><span style="font-size:11px;font-weight:400;color:#8FAAC4">风险智能分析平台</span></div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:8px 0">
+      <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="5">
+        <div>
+          <div onClick="{{ g.toggle }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 16px;font-size:14px;cursor:pointer;color:#C7D6E4" style-hover="color:#fff">
+            <span style="width:16px;text-align:center;opacity:.85">{{ g.icon }}</span>
+            <span style="flex:1">{{ g.name }}</span>
+            <sc-if value="{{ g.hasChildren }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:10px;color:#7E9AB4">{{ g.chev }}</span>
+            </sc-if>
+          </div>
+          <sc-if value="{{ g.open }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <div onClick="{{ it.click }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 16px 0 42px;font-size:13px;cursor:pointer;color:{{ it.fg }};background:{{ it.bg }};border-left:3px solid {{ it.bar }};font-weight:{{ it.weight }}" style-hover="color:#fff">
+                  <span style="flex:1">{{ it.name }}</span>
+                  <sc-if value="{{ it.badge }}" hint-placeholder-val="{{ false }}">
+                    <span class="num" style="font-size:11px;background:#C0392B;color:#fff;border-radius:9px;padding:0 7px">{{ it.badge }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#7E9AB4">v1.0 · 政务内网</div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="position:sticky;top:0;z-index:30;height:56px;flex:none;background:#fff;border-bottom:1px solid #D8DEE6;display:flex;align-items:center;padding:0 24px;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#6E7C8B">
+        <a href="#" style="color:#6E7C8B">首页</a><span style="color:#B6C0CA">/</span>
+        <a href="#" style="color:#6E7C8B">决策分析</a><span style="color:#B6C0CA">/</span>
+        <span style="color:#1C2733;font-weight:600">税源分析</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+        <span class="num" style="font-size:12px;color:#97A3B0;margin-right:6px">数据更新 2026-07-24 08:00</span>
+        <div style="position:relative">
+          <div onClick="{{ timeToggle }}" style="min-width:126px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">时间</span><span>{{ timeVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ timeOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0">
+              <sc-for list="{{ timeOptions }}" as="o" hint-placeholder-count="4">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position:relative">
+          <div onClick="{{ distToggle }}" style="min-width:112px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">区县</span><span>{{ distVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ distOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0;max-height:260px;overflow:auto">
+              <sc-for list="{{ distOptions }}" as="o" hint-placeholder-count="5">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <button style="height:32px;padding:0 14px;border:1px solid #1D5A99;border-radius:2px;background:#1D5A99;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit" style-hover="background:#16436F;border-color:#16436F"><span style="font-size:14px">⤓</span> 导出</button>
+      </div>
+    </header>
+
+    <main style="padding:20px 24px 40px;display:flex;flex-direction:column;gap:20px">
+
+      <!-- ── 指标横条 ── -->
+      <div style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:14px 22px;display:flex;align-items:center;gap:0">
+        <sc-for list="{{ headStats }}" as="k" hint-placeholder-count="5">
+          <div style="flex:1;display:flex;align-items:baseline;gap:10px;border-left:{{ k.bl }};padding-left:{{ k.pl }}">
+            <span style="font-size:13px;color:#6E7C8B;white-space:nowrap">{{ k.label }}</span>
+            <span class="num" style="font-size:24px;font-weight:600;color:{{ k.color }}">{{ k.value }}</span>
+            <span style="font-size:12px;color:#97A3B0;white-space:nowrap">{{ k.note }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- ── 帕累托 + 集中度 ── -->
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px">
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+          <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:8px">
+            <h2 style="font-size:16px;font-weight:600;margin:0">重点税源集中度 · 帕累托</h2>
+            <span style="font-size:12px;color:#97A3B0">TOP 15 纳税户(脱敏)· 柱:本年入库(万元) 线:累计占比</span>
+            <span class="num" style="margin-left:auto;font-size:13px;color:#1D5A99;font-weight:600">前 10 户贡献全市税收 42.6%</span>
+          </div>
+          <svg viewBox="0 0 1000 300" style="width:100%;display:block">
+            <sc-for list="{{ prGrid }}" as="g" hint-placeholder-count="4">
+              <line x1="56" y1="{{ g.y }}" x2="944" y2="{{ g.y }}" stroke="#EAEEF3" stroke-width="1"></line>
+            </sc-for>
+            <sc-for list="{{ prGrid }}" as="g" hint-placeholder-count="4">
+              <text x="48" y="{{ g.ty }}" text-anchor="end" font-size="11" fill="#97A3B0">{{ g.label }}</text>
+            </sc-for>
+            <sc-for list="{{ prRight }}" as="g" hint-placeholder-count="3">
+              <text x="952" y="{{ g.ty }}" text-anchor="start" font-size="11" fill="#5FA8D3">{{ g.label }}</text>
+            </sc-for>
+            <sc-for list="{{ prBars }}" as="b" hint-placeholder-count="15">
+              <g onMouseEnter="{{ b.enter }}" onMouseLeave="{{ tipLeave }}" style="cursor:pointer">
+                <rect x="{{ b.x }}" y="{{ b.y }}" width="40" height="{{ b.h }}" fill="#1D5A99" opacity="{{ b.op }}"></rect>
+                <text x="{{ b.cx }}" y="290" text-anchor="middle" font-size="11" fill="#6E7C8B">{{ b.label }}</text>
+              </g>
+            </sc-for>
+            <path d="{{ prLine }}" fill="none" stroke="#5FA8D3" stroke-width="2.5" stroke-linejoin="round"></path>
+            <sc-for list="{{ prPts }}" as="p" hint-placeholder-count="15">
+              <circle cx="{{ p.x }}" cy="{{ p.y }}" r="3.5" fill="#fff" stroke="#5FA8D3" stroke-width="2"></circle>
+            </sc-for>
+            <line x1="56" y1="{{ pr80y }}" x2="944" y2="{{ pr80y }}" stroke="#C77A1B" stroke-width="1" stroke-dasharray="5 4"></line>
+            <text x="944" y="{{ pr80ty }}" text-anchor="end" font-size="11" fill="#C77A1B">80% 线</text>
+          </svg>
+        </section>
+
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+          <h2 style="font-size:16px;font-weight:600;margin:0">集中度指标</h2>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <sc-for list="{{ crBars }}" as="c" hint-placeholder-count="3">
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span style="color:#5A6B7B">{{ c.name }}</span><span class="num" style="font-weight:600">{{ c.pct }}%<span style="font-size:11px;font-weight:400;color:{{ c.dColor }};margin-left:6px">{{ c.delta }}</span></span></div>
+                <div style="height:10px;background:#EAEEF3;border-radius:1px"><div style="height:10px;width:{{ c.w }};background:#1D5A99;border-radius:1px"></div></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="border-top:1px solid #EAEEF3;padding-top:12px">
+            <div style="font-size:12px;color:#6E7C8B;margin-bottom:8px">纳税规模梯队 · 户数</div>
+            <div style="display:flex;flex-direction:column;gap:7px">
+              <sc-for list="{{ tiers }}" as="t" hint-placeholder-count="5">
+                <div style="display:flex;align-items:center;gap:10px;font-size:13px">
+                  <span style="width:88px;flex:none;color:#4C5A68;white-space:nowrap">{{ t.name }}</span>
+                  <div style="flex:1;height:9px;background:#EAEEF3;border-radius:1px"><div style="height:9px;width:{{ t.w }};background:#5FA8D3;border-radius:1px"></div></div>
+                  <span class="num" style="width:56px;text-align:right;flex:none;font-weight:600">{{ t.n }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="margin-top:auto;font-size:12px;color:#6E7C8B;background:#F4F6F9;border-radius:2px;padding:8px 10px">HHI 指数 <span class="num" style="font-weight:600;color:#1C2733">0.087</span>,较上年 +0.006,税源集中度持续上升,重点税源依赖度需关注</div>
+        </section>
+      </div>
+
+      <!-- ── 税源流动 ── -->
+      <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+        <div style="display:flex;align-items:baseline;gap:16px;margin-bottom:8px">
+          <h2 style="font-size:16px;font-weight:600;margin:0">税源流动 · 月度新办 / 注销 / 迁入 / 迁出</h2>
+          <div style="margin-left:auto;display:flex;gap:16px;font-size:12px;color:#6E7C8B">
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#1D5A99;border-radius:1px"></span>新办</span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#5FA8D3;border-radius:1px"></span>迁入</span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#C0392B;border-radius:1px"></span>注销</span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:#D98A24;border-radius:1px"></span>迁出</span>
+            <span style="color:#97A3B0">单位:户</span>
+          </div>
+        </div>
+        <svg viewBox="0 0 1060 260" style="width:100%;display:block">
+          <line x1="52" y1="130" x2="1048" y2="130" stroke="#B6C0CA" stroke-width="1.5"></line>
+          <sc-for list="{{ flowCols }}" as="c" hint-placeholder-count="7">
+            <g onMouseEnter="{{ c.enter }}" onMouseLeave="{{ tipLeave }}" style="cursor:pointer">
+              <rect x="{{ c.x }}" y="{{ c.yNew }}" width="34" height="{{ c.hNew }}" fill="#1D5A99"></rect>
+              <rect x="{{ c.x }}" y="{{ c.yIn }}" width="34" height="{{ c.hIn }}" fill="#5FA8D3"></rect>
+              <rect x="{{ c.x2 }}" y="131" width="34" height="{{ c.hOut1 }}" fill="#C0392B"></rect>
+              <rect x="{{ c.x2 }}" y="{{ c.yOut2 }}" width="34" height="{{ c.hOut2 }}" fill="#D98A24"></rect>
+              <text x="{{ c.cx }}" y="252" text-anchor="middle" font-size="12" fill="#6E7C8B">{{ c.label }}</text>
+              <text x="{{ c.cx }}" y="{{ c.netY }}" text-anchor="middle" font-size="12" font-weight="600" fill="{{ c.netColor }}" class="num">{{ c.net }}</text>
+            </g>
+          </sc-for>
+        </svg>
+        <div style="font-size:12px;color:#6E7C8B;margin-top:4px">柱上数字为当月净变动;6 月起迁出户数环比上升 38%,其中 62% 迁往周边低税负园区,建议关注</div>
+      </section>
+
+      <!-- ── 行业演变 + 区域气泡 ── -->
+      <div style="display:grid;grid-template-columns:1fr 1.15fr;gap:20px">
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
+            <h2 style="font-size:16px;font-weight:600;margin:0">行业结构演变 · 近 8 季度</h2>
+            <span style="font-size:12px;color:#97A3B0">税收占比 100% 堆叠</span>
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:#6E7C8B;margin-bottom:8px;flex-wrap:wrap">
+            <sc-for list="{{ indLegend }}" as="l" hint-placeholder-count="5">
+              <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;background:{{ l.hex }};border-radius:1px"></span>{{ l.name }}</span>
+            </sc-for>
+          </div>
+          <svg viewBox="0 0 520 240" style="width:100%;display:block">
+            <sc-for list="{{ indAreas }}" as="a" hint-placeholder-count="5">
+              <polygon points="{{ a.pts }}" fill="{{ a.hex }}" fill-opacity="0.88"></polygon>
+            </sc-for>
+            <sc-for list="{{ indQs }}" as="q" hint-placeholder-count="8">
+              <rect onMouseEnter="{{ q.enter }}" onMouseLeave="{{ tipLeave }}" x="{{ q.x }}" y="10" width="{{ q.w }}" height="200" fill="transparent" style="cursor:pointer"></rect>
+            </sc-for>
+            <sc-for list="{{ indQs }}" as="q" hint-placeholder-count="8">
+              <text x="{{ q.cx }}" y="232" text-anchor="middle" font-size="11" fill="#6E7C8B">{{ q.label }}</text>
+            </sc-for>
+          </svg>
+          <div style="font-size:12px;color:#6E7C8B;margin-top:6px">现代服务业占比由 14.2% 升至 19.8%;建筑房地产由 26.4% 降至 20.1%</div>
+        </section>
+
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px">
+            <h2 style="font-size:16px;font-weight:600;margin:0">区域税源分布 · 气泡矩阵</h2>
+            <span style="font-size:12px;color:#97A3B0">横轴:税源户数 纵轴:户均税额(万元) 气泡:税收总量</span>
+          </div>
+          <div style="display:flex;gap:18px">
+            <svg viewBox="0 0 460 280" style="flex:1;display:block;min-width:0">
+              <line x1="48" y1="10" x2="48" y2="244" stroke="#D8DEE6" stroke-width="1"></line>
+              <line x1="48" y1="244" x2="450" y2="244" stroke="#D8DEE6" stroke-width="1"></line>
+              <line x1="{{ bbMeanX }}" y1="10" x2="{{ bbMeanX }}" y2="244" stroke="#C4CDD6" stroke-width="1" stroke-dasharray="4 3"></line>
+              <line x1="48" y1="{{ bbMeanY }}" x2="450" y2="{{ bbMeanY }}" stroke="#C4CDD6" stroke-width="1" stroke-dasharray="4 3"></line>
+              <text x="446" y="24" text-anchor="end" font-size="10" fill="#B6C0CA">户多 · 均额高</text>
+              <text x="52" y="24" text-anchor="start" font-size="10" fill="#B6C0CA">户少 · 均额高</text>
+              <text x="446" y="238" text-anchor="end" font-size="10" fill="#B6C0CA">户多 · 均额低</text>
+              <sc-for list="{{ bubbles }}" as="b" hint-placeholder-count="10">
+                <g onMouseEnter="{{ b.enter }}" onMouseLeave="{{ tipLeave }}" style="cursor:pointer">
+                  <circle cx="{{ b.x }}" cy="{{ b.y }}" r="{{ b.r }}" fill="#1D5A99" fill-opacity="0.35" stroke="#1D5A99" stroke-width="1.5"></circle>
+                  <text x="{{ b.x }}" y="{{ b.ly }}" text-anchor="middle" font-size="11" fill="#16436F" font-weight="600">{{ b.name }}</text>
+                </g>
+              </sc-for>
+              <sc-for list="{{ bbXTicks }}" as="t" hint-placeholder-count="4">
+                <text x="{{ t.x }}" y="260" text-anchor="middle" font-size="10" fill="#97A3B0" class="num">{{ t.label }}</text>
+              </sc-for>
+              <sc-for list="{{ bbYTicks }}" as="t" hint-placeholder-count="4">
+                <text x="42" y="{{ t.y }}" text-anchor="end" font-size="10" fill="#97A3B0" class="num">{{ t.label }}</text>
+              </sc-for>
+            </svg>
+            <div style="width:172px;flex:none;border-left:1px solid #EAEEF3;padding-left:16px">
+              <div style="font-size:12px;color:#6E7C8B;margin-bottom:8px">区县税收排行(亿元)</div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <sc-for list="{{ distRank }}" as="d" hint-placeholder-count="8">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;padding:1px 2px" style-hover="color:#1D5A99">
+                    <span class="num" style="width:16px;color:{{ d.rc }};font-weight:600">{{ d.rank }}</span>
+                    <span style="flex:1;color:#4C5A68">{{ d.name }}</span>
+                    <span class="num" style="font-weight:600">{{ d.val }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:{{ tipX }}px;top:{{ tipY }}px;z-index:99;pointer-events:none;background:rgba(22,39,55,.96);color:#fff;border-radius:3px;padding:10px 14px;min-width:190px;box-shadow:0 6px 20px rgba(28,39,51,.3)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.16);padding-bottom:5px">{{ tipTitle }}</div>
+      <sc-for list="{{ tipRows }}" as="t" hint-placeholder-count="3">
+        <div style="display:flex;justify-content:space-between;gap:18px;font-size:12px;line-height:1.9"><span style="color:#A9C0D4">{{ t.k }}</span><span class="num" style="font-weight:600">{{ t.v }}</span></div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {openGroups: {'决策分析': true}, tip: null, timeOpen: false, distOpen: false, timeVal: '本年度', distVal: '全市'};
+  setTip(e, title, rows){
+    const r = e.currentTarget.getBoundingClientRect();
+    let x = r.left + r.width/2 - 100, y = r.bottom + 10;
+    x = Math.max(12, Math.min(x, window.innerWidth - 240));
+    if (y > window.innerHeight - 170) y = r.top - 150;
+    this.setState({tip: {x, y, title, rows}});
+  }
+  navGroups(active){
+    const S = this.state;
+    const GROUPS = [
+      {name:'领导驾驶舱', icon:'▤', href:'./领导驾驶舱.dc.html'},
+      {name:'风险监控', icon:'▦', items:[{name:'风险线索工作台', badge:'137', href:'./风险线索工作台.dc.html'},{name:'核查任务管理'},{name:'风险规则配置', href:'./规则库配置.dc.html'}]},
+      {name:'决策分析', icon:'▧', items:[{name:'收入分析', href:'./收入分析.dc.html'},{name:'税源分析', href:'./税源分析.dc.html'},{name:'治税成效分析', href:'./治税成效分析.dc.html'},{name:'专题分析', href:'./专题分析.dc.html'},{name:'统计报表'}]},
+      {name:'数据资产', icon:'▥', items:[{name:'一户式档案', href:'./一户式档案详情.dc.html'},{name:'关联图谱分析', href:'./关联图谱分析.dc.html'}]},
+      {name:'智能应用', icon:'✦', items:[{name:'政策智能问答', href:'./政策智能问答.dc.html'}]},
+      {name:'系统管理', icon:'⚙'},
+    ];
+    return GROUPS.map(g => {
+      const hasChildren = !!g.items, open = hasChildren && !!S.openGroups[g.name];
+      return {
+        name: g.name, icon: g.icon, hasChildren, open, chev: open ? '▾' : '▸',
+        toggle: () => hasChildren ? this.setState(s => ({openGroups: {...s.openGroups, [g.name]: !s.openGroups[g.name]}})) : (g.href && (window.location.href = g.href)),
+        items: (g.items || []).map(it => {
+          const on = it.name === active;
+          return {name: it.name, badge: it.badge || '',
+            fg: on ? '#fff' : '#A9C0D4', bg: on ? 'rgba(95,168,211,.16)' : 'transparent',
+            bar: on ? '#5FA8D3' : 'transparent', weight: on ? 600 : 400,
+            click: () => !on && it.href && (window.location.href = it.href)};
+        })
+      };
+    });
+  }
+  renderVals(){
+    const S = this.state, fmt = n => n.toLocaleString('en-US');
+    const mkOpts = (list, cur, key, openKey) => list.map(n => ({
+      name: n, fg: n === cur ? '#1D5A99' : '#1C2733', bg: n === cur ? '#EEF4FA' : 'transparent',
+      click: () => this.setState({[key]: n, [openKey]: false})
+    }));
+    const headStats = [
+      {label:'在册税源', value:'48,214', note:'户', color:'#1C2733'},
+      {label:'本年净增', value:'+1,872', note:'户 · +4.0%', color:'#1E7F4F'},
+      {label:'CR10', value:'42.6%', note:'前十户税收占比', color:'#1C2733'},
+      {label:'HHI 指数', value:'0.087', note:'较上年 +0.006', color:'#C77A1B'},
+      {label:'月均迁出', value:'86', note:'户 · 环比 +38%', color:'#C0392B'},
+    ].map((k, i) => ({...k, bl: i ? '1px solid #EAEEF3' : 'none', pl: i ? '24px' : '0'}));
+    // ── 帕累托 ──
+    const ENT = [
+      ['某能源集团 *', 28640],['某汽车制造 *', 21360],['某电子科技 *', 16820],['某房地产开发 *', 13240],
+      ['某商业银行 *', 11080],['某烟草公司 *', 9640],['某医药控股 *', 8120],['某建工集团 *', 7260],
+      ['某物流股份 *', 6180],['某百货零售 *', 5430],['某化工材料 *', 4820],['某食品饮料 *', 4210],
+      ['某软件信息 *', 3860],['某酒店文旅 *', 3420],['某装备制造 *', 3110]];
+    const TOTAL = 340000;
+    const py = v => 258 - v / 30000 * 240, pyPct = p => 258 - p / 100 * 240;
+    let acc = 0;
+    const prBars = [], prPts = [];
+    ENT.forEach((e, i) => {
+      acc += e[1];
+      const x = 68 + i * 58, cx = x + 20, cum = acc / TOTAL * 100;
+      prBars.push({x, cx, y: py(e[1]), h: 258 - py(e[1]), op: 1 - i * 0.045, label: 'No.' + (i+1),
+        enter: (ev) => this.setTip(ev, e[0], [
+          {k:'本年入库', v: fmt(e[1]) + ' 万元'}, {k:'占全市', v: (e[1]/TOTAL*100).toFixed(1) + '%'}, {k:'累计占比', v: cum.toFixed(1) + '%'}])});
+      prPts.push({x: cx, y: pyPct(cum)});
+    });
+    const prLine = prPts.map((p, i) => (i ? 'L' : 'M') + p.x + ' ' + p.y).join(' ');
+    const prGrid = [0, 10000, 20000, 30000].map(v => ({y: py(v), ty: py(v) + 4, label: v/10000 + '亿'}));
+    const prRight = [0, 50, 100].map(p => ({ty: pyPct(p) + 4, label: p + '%'}));
+    // ── 集中度 ──
+    const crBars = [
+      {name:'CR5(前 5 户)', pct: 26.8, delta:'+1.2pct', up: true},
+      {name:'CR10(前 10 户)', pct: 42.6, delta:'+2.1pct', up: true},
+      {name:'CR50(前 50 户)', pct: 63.4, delta:'+0.8pct', up: true},
+    ].map(c => ({...c, w: c.pct + '%', dColor: '#C77A1B'}));
+    const tiers = [
+      ['亿元以上', 12],['5000万–1亿', 31],['1000–5000万', 187],['100–1000万', 1642],['100万以下', 46342]];
+    const tMax = Math.log10(46342);
+    const tiersV = tiers.map(t => ({name: t[0], n: fmt(t[1]), w: Math.round(Math.log10(t[1]) / tMax * 100) + '%'}));
+    // ── 税源流动 ──
+    const FLOW = [
+      {m:'1月', add:412, moveIn:38, cancel:186, moveOut:42},{m:'2月', add:268, moveIn:24, cancel:142, moveOut:35},
+      {m:'3月', add:486, moveIn:45, cancel:210, moveOut:51},{m:'4月', add:441, moveIn:41, cancel:198, moveOut:58},
+      {m:'5月', add:463, moveIn:36, cancel:224, moveOut:64},{m:'6月', add:428, moveIn:32, cancel:246, moveOut:96},
+      {m:'7月', add:389, moveIn:29, cancel:238, moveOut:118}];
+    const fs = v => v / 550 * 110;
+    const flowCols = FLOW.map((f, i) => {
+      const x = 90 + i * 136, net = f.add + f.moveIn - f.cancel - f.moveOut;
+      const hNew = fs(f.add), hIn = fs(f.moveIn), hOut1 = fs(f.cancel), hOut2 = fs(f.moveOut);
+      return {x, x2: x + 38, cx: x + 36, label: f.m,
+        hNew, yNew: 129 - hNew, hIn, yIn: 129 - hNew - hIn,
+        hOut1, hOut2, yOut2: 131 + hOut1,
+        net: (net >= 0 ? '+' : '') + net, netColor: net >= 0 ? '#1E7F4F' : '#C0392B',
+        netY: 129 - hNew - hIn - 8,
+        enter: (e) => this.setTip(e, f.m + ' 税源流动', [
+          {k:'新办', v: '+' + f.add + ' 户'}, {k:'迁入', v: '+' + f.moveIn + ' 户'},
+          {k:'注销', v: '-' + f.cancel + ' 户'}, {k:'迁出', v: '-' + f.moveOut + ' 户'}])};
+    });
+    // ── 行业结构演变 ──
+    const IND = [
+      {name:'制造业', hex:'#16436F', v:[24.6,24.8,25.1,25.6,25.9,26.2,26.8,27.1]},
+      {name:'建筑房地产', hex:'#1D5A99', v:[26.4,25.6,24.8,23.9,22.8,21.9,20.8,20.1]},
+      {name:'批发零售', hex:'#3E7FB5', v:[19.8,19.6,19.4,19.2,19.0,18.8,18.6,18.4]},
+      {name:'现代服务业', hex:'#5FA8D3', v:[14.2,15.1,15.9,16.7,17.5,18.3,19.1,19.8]},
+      {name:'其他行业', hex:'#B5D9FD', v:[15.0,14.9,14.8,14.6,14.8,14.8,14.7,14.6]},
+    ];
+    const QL = ['24Q4','25Q1','25Q2','25Q3','25Q4','26Q1','26Q2','26Q3E'];
+    const ix = i => 20 + i * (480 / 7), iy = p => 210 - p / 100 * 200;
+    const cumTop = IND.map(() => []);
+    for (let q = 0; q < 8; q++) { let c = 0; IND.forEach((ind, k) => { c += ind.v[q]; cumTop[k].push(c); }); }
+    const indAreas = IND.map((ind, k) => {
+      const top = cumTop[k].map((c, q) => ix(q) + ',' + iy(c));
+      const bot = (k === 0 ? QL.map((_, q) => ix(q) + ',' + iy(0)) : cumTop[k-1].map((c, q) => ix(q) + ',' + iy(c))).reverse();
+      return {hex: ind.hex, pts: top.concat(bot).join(' ')};
+    });
+    const indQs = QL.map((l, q) => ({
+      x: ix(q) - 34, w: 68, cx: ix(q), label: l,
+      enter: (e) => this.setTip(e, l + ' 行业税收占比', IND.map(ind => ({k: ind.name, v: ind.v[q].toFixed(1) + '%'})))
+    }));
+    // ── 气泡矩阵 ──
+    const DIST = [
+      ['城东区', 9840, 18.2, 17.9],['高新区', 5620, 26.4, 14.8],['城西区', 7410, 14.6, 10.8],
+      ['经开区', 4280, 21.5, 9.2],['城南区', 6120, 10.4, 6.4],['城北区', 5480, 9.8, 5.4],
+      ['临港新区', 2360, 19.6, 4.6],['江北区', 3140, 8.2, 2.6],['湖滨区', 2210, 9.1, 2.0],['老城区', 1750, 7.4, 1.3]];
+    const bx = h => 48 + (h / 10000) * 390, by = a => 244 - (a / 28) * 226;
+    const bubbles = DIST.map(d => {
+      const r = 6 + Math.sqrt(d[3]) * 5.4;
+      return {name: d[0], x: Math.round(bx(d[1])), y: Math.round(by(d[2])), r: Math.round(r), ly: Math.round(by(d[2]) - r - 4),
+        enter: (e) => this.setTip(e, d[0], [
+          {k:'税源户数', v: fmt(d[1]) + ' 户'}, {k:'户均税额', v: d[2] + ' 万元'}, {k:'税收总量', v: d[3] + ' 亿元'}])};
+    });
+    const meanH = DIST.reduce((s, d) => s + d[1], 0) / DIST.length;
+    const meanA = DIST.reduce((s, d) => s + d[2], 0) / DIST.length;
+    const bbXTicks = [2000, 4000, 6000, 8000, 10000].map(v => ({x: Math.round(bx(v)), label: fmt(v)}));
+    const bbYTicks = [7, 14, 21, 28].map(v => ({y: Math.round(by(v)) + 4, label: v}));
+    const distRank = [...DIST].sort((a, b) => b[3] - a[3]).map((d, i) => ({
+      rank: i + 1, name: d[0], val: d[3].toFixed(1), rc: i < 3 ? '#1D5A99' : '#97A3B0'}));
+    return {
+      navGroups: this.navGroups('税源分析'),
+      timeVal: S.timeVal, distVal: S.distVal, timeOpen: S.timeOpen, distOpen: S.distOpen,
+      timeToggle: () => this.setState(s => ({timeOpen: !s.timeOpen, distOpen: false})),
+      distToggle: () => this.setState(s => ({distOpen: !s.distOpen, timeOpen: false})),
+      timeOptions: mkOpts(['本月','本季度','本年度','近 12 个月','自定义…'], S.timeVal, 'timeVal', 'timeOpen'),
+      distOptions: mkOpts(['全市','城东区','城西区','城南区','城北区','高新区','经开区','临港新区'], S.distVal, 'distVal', 'distOpen'),
+      headStats, prBars, prPts, prLine, prGrid, prRight, pr80y: pyPct(80), pr80ty: pyPct(80) - 6,
+      crBars, tiers: tiersV, flowCols,
+      indLegend: IND.map(i => ({name: i.name, hex: i.hex})), indAreas, indQs,
+      bubbles, bbMeanX: Math.round(bx(meanH)), bbMeanY: Math.round(by(meanA)), bbXTicks, bbYTicks, distRank,
+      tipLeave: () => this.setState({tip: null}),
+      tipShow: !!S.tip, tipX: S.tip?.x ?? 0, tipY: S.tip?.y ?? 0,
+      tipTitle: S.tip?.title ?? '', tipRows: S.tip?.rows ?? []
+    };
+  }
+}
+</script>
+</body>
+</html>

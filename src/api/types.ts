@@ -913,16 +913,119 @@ export interface DecisionFilters {
 /** KPI 卡(带顶部语义色条) */
 export type DecisionKpi = MetricItem & { accent: KpiAccent }
 
+/** 收入分析·预算执行进度 */
+export interface RevenueProgress {
+  /** 周期文案(本年度…) */
+  periodLabel: string
+  /** 时间进度(百分数) */
+  timeProgress: number
+  /** 时间进度说明 */
+  timeNote: string
+  /** 收入进度(百分数) */
+  revenueProgress: number
+  /** 收入进度说明(入库/预算) */
+  revenueNote: string
+  /** 落后提示文案 */
+  laggingNote: string
+}
+
+/** 收入分析·进度卡右侧内联指标 */
+export interface RevenueHeadStat {
+  /** 名称 */
+  label: string
+  /** 数值(已格式化,含正负号) */
+  value: string
+  /** 单位 */
+  unit: string
+  /** 补充说明 */
+  note: string
+  /** 数值取色语气 */
+  tone: Tone
+}
+
+/** 瀑布图节点类型:基准柱 / 增减量 */
+export type WaterfallKind = 'base' | 'delta'
+
+/** 瀑布图单项 */
+export interface WaterfallItem {
+  /** 名称(去年同期 / 各税种 / 今年同期) */
+  name: string
+  /** 类型 */
+  kind: WaterfallKind
+  /** base:该柱绝对值;delta:同比增减量(亿元,带符号) */
+  value: number
+  /** 同比幅度文案(delta 用,base 为空串) */
+  pct: string
+}
+
+/** 分级次月度收入数据 */
+export interface RevenueLevelData {
+  /** 级次名称(中央级/省级/市级/县区级,自下而上) */
+  levelNames: string[]
+  /** 月份标签 */
+  months: string[]
+  /** 各月合计(亿元) */
+  monthTotals: number[]
+  /** 各月各级次占比 shares[月][级次] */
+  shares: number[][]
+}
+
+/** 收入预测数据 */
+export interface RevenueForecast {
+  /** 月份标签(1–12 月) */
+  months: string[]
+  /** 实际入库(前 7 月,亿元) */
+  actual: number[]
+  /** 模型预测(后 5 月,亿元) */
+  predicted: number[]
+  /** 各预测点 90% 区间半宽 */
+  bandWidth: number[]
+  /** 全年预测总额文案 */
+  yearForecast: string
+  /** 预测区间文案 */
+  range: string
+  /** 预算达成概率文案 */
+  achieveProb: string
+}
+
+/** 明细表·区县下钻子行 */
+export interface RevenueDistrictShare {
+  /** 区县名 */
+  name: string
+  /** 占该税种入库比例(0–1) */
+  share: number
+  /** 同比文案 */
+  yoy: string
+}
+
+/** 明细表·分税种行 */
+export interface RevenueTaxRow {
+  /** 税种名 */
+  name: string
+  /** 年度预算(亿元) */
+  budget: number
+  /** 累计入库(亿元) */
+  actual: number
+  /** 同比文案 */
+  yoy: string
+  /** 区县下钻子行 */
+  districts: RevenueDistrictShare[]
+}
+
 /** 收入分析 */
 export interface RevenueAnalysis {
-  /** 顶部 KPI */
-  kpis: DecisionKpi[]
-  /** 收入趋势(近 12 月,亿元) */
-  trend: SeriesPoint[]
-  /** 分税种结构(环形) */
-  structure: TaxTypeStructure
-  /** 分区县收入(万元,已降序) */
-  districts: NamedValue[]
+  /** 预算执行进度 */
+  progress: RevenueProgress
+  /** 进度卡右侧内联指标 */
+  headStats: RevenueHeadStat[]
+  /** 同比增幅归因瀑布 */
+  waterfall: WaterfallItem[]
+  /** 分级次月度收入 */
+  levelData: RevenueLevelData
+  /** 全年收入预测 */
+  forecast: RevenueForecast
+  /** 分税种执行明细 */
+  taxRows: RevenueTaxRow[]
 }
 
 /** 税源分析 */

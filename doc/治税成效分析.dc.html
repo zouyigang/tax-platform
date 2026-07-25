@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#EEF1F5;color:#1C2733;font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:#1D5A99;text-decoration:none}
+  a:hover{color:#16436F;text-decoration:underline}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+</style>
+</helmet>
+<div data-screen-label="治税成效分析" style="display:flex;min-height:100vh;background:#EEF1F5;min-width:1280px">
+
+  <!-- ══ 侧栏(两级折叠) ══ -->
+  <nav style="width:210px;flex:none;position:sticky;top:0;height:100vh;background:#16436F;color:#C7D6E4;display:flex;flex-direction:column">
+    <div style="height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.08)">
+      <div style="width:28px;height:28px;background:#5FA8D3;color:#16436F;border-radius:2px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none">税</div>
+      <div style="font-size:14px;font-weight:600;color:#fff;line-height:1.25">智慧综合治税<br><span style="font-size:11px;font-weight:400;color:#8FAAC4">风险智能分析平台</span></div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:8px 0">
+      <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="5">
+        <div>
+          <div onClick="{{ g.toggle }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 16px;font-size:14px;cursor:pointer;color:{{ g.fg }}" style-hover="color:#fff">
+            <span style="width:16px;text-align:center;opacity:.85">{{ g.icon }}</span>
+            <span style="flex:1">{{ g.name }}</span>
+            <sc-if value="{{ g.hasChildren }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:10px;color:#7E9AB4">{{ g.chev }}</span>
+            </sc-if>
+          </div>
+          <sc-if value="{{ g.open }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <div onClick="{{ it.click }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 16px 0 42px;font-size:13px;cursor:pointer;color:{{ it.fg }};background:{{ it.bg }};border-left:3px solid {{ it.bar }};font-weight:{{ it.weight }}" style-hover="color:#fff">
+                  <span style="flex:1">{{ it.name }}</span>
+                  <sc-if value="{{ it.badge }}" hint-placeholder-val="{{ false }}">
+                    <span class="num" style="font-size:11px;background:#C0392B;color:#fff;border-radius:9px;padding:0 7px">{{ it.badge }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#7E9AB4">v1.0 · 政务内网</div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+    <!-- ══ 顶栏:面包屑 + 筛选 ══ -->
+    <header style="position:sticky;top:0;z-index:30;height:56px;flex:none;background:#fff;border-bottom:1px solid #D8DEE6;display:flex;align-items:center;padding:0 24px;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#6E7C8B">
+        <a href="#" style="color:#6E7C8B">首页</a><span style="color:#B6C0CA">/</span>
+        <a href="#" style="color:#6E7C8B">决策分析</a><span style="color:#B6C0CA">/</span>
+        <span style="color:#1C2733;font-weight:600">治税成效分析</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+        <span class="num" style="font-size:12px;color:#97A3B0;margin-right:6px">数据更新 2026-07-24 08:00</span>
+        <div style="position:relative">
+          <div onClick="{{ timeToggle }}" style="min-width:126px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">时间</span><span>{{ timeVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ timeOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0">
+              <sc-for list="{{ timeOptions }}" as="o" hint-placeholder-count="4">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position:relative">
+          <div onClick="{{ distToggle }}" style="min-width:112px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">区县</span><span>{{ distVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ distOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0;max-height:260px;overflow:auto">
+              <sc-for list="{{ distOptions }}" as="o" hint-placeholder-count="5">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <button style="height:32px;padding:0 14px;border:1px solid #1D5A99;border-radius:2px;background:#1D5A99;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit" style-hover="background:#16436F;border-color:#16436F"><span style="font-size:14px">⤓</span> 导出</button>
+      </div>
+    </header>
+
+    <!-- ══ 内容区 ══ -->
+    <main style="padding:20px 24px 40px;display:flex;flex-direction:column;gap:20px">
+
+      <!-- ── 闭环漏斗 ── -->
+      <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px 16px">
+        <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px">
+          <h2 style="font-size:16px;font-weight:600;margin:0">治税闭环全流程 · {{ timeVal }}</h2>
+          <span style="font-size:12px;color:#97A3B0">点击任一环节下钻明细,悬停查看提示</span>
+          <span class="num" style="margin-left:auto;font-size:13px;color:#1E7F4F;font-weight:600">整体入库转化 8.7%,累计增收 3.42 亿元</span>
+        </div>
+        <div style="display:flex;align-items:stretch">
+          <sc-for list="{{ stages }}" as="s" hint-placeholder-count="5">
+            <div style="display:contents">
+              <div onClick="{{ s.click }}" onMouseEnter="{{ s.enter }}" onMouseLeave="{{ tipLeave }}" style="flex:1;min-width:0;border:{{ s.border }};border-radius:2px;padding:0 0 12px;cursor:pointer;background:{{ s.bg }};box-shadow:{{ s.shadow }}" style-hover="border-color:#1D5A99">
+                <div style="height:5px;background:{{ s.color }};border-radius:2px 2px 0 0;margin-bottom:12px"></div>
+                <div style="padding:0 16px">
+                  <div style="font-size:13px;color:#5A6B7B;display:flex;justify-content:space-between;align-items:center">{{ s.name }}<span class="num" style="font-size:12px;color:{{ s.stepFg }}">{{ s.step }}</span></div>
+                  <div class="num" style="font-size:30px;font-weight:600;line-height:1.3;letter-spacing:-.01em">{{ s.countFmt }}<span style="font-size:13px;font-weight:400;color:#6E7C8B;margin-left:4px">{{ s.unit }}</span></div>
+                  <div style="display:flex;justify-content:space-between;font-size:12px;color:#6E7C8B;margin-top:4px"><span>{{ s.sub }}</span><span class="num">平均 {{ s.days }}</span></div>
+                  <div style="height:6px;background:#EAEEF3;border-radius:1px;margin-top:10px"><div style="height:6px;width:{{ s.w }};background:{{ s.color }};border-radius:1px"></div></div>
+                </div>
+              </div>
+              <sc-if value="{{ s.conn }}" hint-placeholder-val="{{ false }}">
+                <div style="width:96px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 6px">
+                  <span class="num" style="font-size:12px;font-weight:600;color:#1E7F4F;background:#E4F3EA;border-radius:2px;padding:1px 8px;white-space:nowrap">{{ s.connRate }}</span>
+                  <span style="color:#B6C0CA;font-size:16px;line-height:1">⟶</span>
+                  <span class="num" style="font-size:11px;color:#C0392B;white-space:nowrap">流失 {{ s.connLoss }}</span>
+                  <span style="font-size:11px;color:#97A3B0;white-space:nowrap">{{ s.connNote }}</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:14px;color:#97A3B0;font-size:12px">
+          <span style="flex:1;border-top:1.5px dashed #C4CDD6"></span>
+          <span>⟲ 成效数据回流 · 反哺规则优化与模型迭代</span>
+          <span style="flex:1;border-top:1.5px dashed #C4CDD6"></span>
+        </div>
+        <!-- 下钻明细 -->
+        <div style="margin-top:14px;border-top:1px solid #EAEEF3;padding-top:14px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+            <span style="width:3px;height:14px;background:{{ drillColor }}"></span>
+            <span style="font-size:14px;font-weight:600">{{ drillTitle }} · 下钻明细</span>
+            <span style="font-size:12px;color:#97A3B0">{{ drillNote }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:28px">
+            <sc-for list="{{ drillCols }}" as="c" hint-placeholder-count="3">
+              <div>
+                <div style="font-size:12px;color:#6E7C8B;margin-bottom:8px">{{ c.title }}</div>
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <sc-for list="{{ c.rows }}" as="r" hint-placeholder-count="4">
+                    <div style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer" style-hover="color:#1D5A99">
+                      <span style="width:96px;flex:none;color:#4C5A68;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</span>
+                      <div style="flex:1;height:10px;background:#EAEEF3;border-radius:1px"><div style="height:10px;width:{{ r.w }};background:{{ drillColor }};border-radius:1px;opacity:.85"></div></div>
+                      <span class="num" style="width:62px;text-align:right;flex:none;font-weight:600">{{ r.val }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── 数据源贡献 + 规则/模型对比 ── -->
+      <div style="display:grid;grid-template-columns:1fr 1.25fr;gap:20px">
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+          <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px">
+            <h2 style="font-size:16px;font-weight:600;margin:0">分数据源增收贡献</h2>
+            <span style="font-size:12px;color:#97A3B0">入库税款 · 万元</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ srcBars }}" as="b" hint-placeholder-count="6">
+              <div onMouseEnter="{{ b.enter }}" onMouseLeave="{{ tipLeave }}" style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:2px 4px;border-radius:2px" style-hover="background:#F4F8FC">
+                <span style="width:110px;flex:none;font-size:13px;color:#4C5A68;text-align:right;white-space:nowrap">{{ b.name }}</span>
+                <div style="flex:1;height:18px;background:#EAEEF3;border-radius:1px"><div style="height:18px;width:{{ b.w }};background:#1D5A99;border-radius:1px;opacity:{{ b.op }}"></div></div>
+                <span class="num" style="width:58px;flex:none;font-size:13px;font-weight:600;text-align:right">{{ b.valFmt }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid #EAEEF3;font-size:12px;color:#6E7C8B;display:flex;justify-content:space-between">
+            <span>共接入 9 类部门数据 · 覆盖 23 个成员单位</span>
+            <span class="num" style="font-weight:600;color:#1C2733">合计 20,710 万元</span>
+          </div>
+        </section>
+
+        <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+            <h2 style="font-size:16px;font-weight:600;margin:0">规则引擎 vs 智能模型 成效对比</h2>
+            <div style="margin-left:auto;display:inline-flex;border:1px solid #D8DEE6;border-radius:2px;overflow:hidden">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+                <div onClick="{{ t.click }}" style="padding:6px 16px;font-size:13px;cursor:pointer;background:{{ t.bg }};color:{{ t.fg }};border-left:{{ t.bl }}" style-hover="color:#1D5A99">{{ t.name }}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="display:flex;gap:18px;font-size:12px;color:#6E7C8B;margin-bottom:8px">
+            <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:11px;background:#1D5A99;border-radius:1px"></span>规则引擎(214 条在用)</span>
+            <span style="display:inline-flex;align-items:center;gap:6px"><span style="width:11px;height:11px;background:#5FA8D3;border-radius:1px"></span>智能模型(9 个在用)</span>
+            <span style="margin-left:auto;color:#1E7F4F;font-weight:600">{{ tabSummary }}</span>
+          </div>
+          <div style="flex:1;display:flex;align-items:flex-end;gap:0;height:200px;border-bottom:1px solid #D8DEE6;padding:0 8px">
+            <sc-for list="{{ cmpGroups }}" as="g" hint-placeholder-count="5">
+              <div onMouseEnter="{{ g.enter }}" onMouseLeave="{{ tipLeave }}" style="flex:1;display:flex;align-items:flex-end;justify-content:center;gap:6px;height:100%;cursor:pointer;padding:0 10px" style-hover="background:#F4F8FC">
+                <div style="width:30px;height:{{ g.h1 }}px;background:#1D5A99;border-radius:1px 1px 0 0"></div>
+                <div style="width:30px;height:{{ g.h2 }}px;background:#5FA8D3;border-radius:1px 1px 0 0"></div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;padding:6px 8px 0">
+            <sc-for list="{{ cmpGroups }}" as="g" hint-placeholder-count="5">
+              <div style="flex:1;text-align:center;font-size:12px;color:#6E7C8B">{{ g.cat }}</div>
+            </sc-for>
+          </div>
+        </section>
+      </div>
+
+      <!-- ── 分局排行表 ── -->
+      <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+          <h2 style="font-size:16px;font-weight:600;margin:0">分局治税成效排行</h2>
+          <span style="font-size:12px;color:#97A3B0">点击列头排序 · 点击行查看分局详情</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr>
+              <sc-for list="{{ tableHeads }}" as="h" hint-placeholder-count="8">
+                <th onClick="{{ h.click }}" style="text-align:{{ h.align }};padding:9px 12px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600;cursor:pointer;white-space:nowrap;user-select:none" style-hover="color:#1D5A99">{{ h.label }} <span class="num" style="font-size:10px;color:{{ h.iconColor }}">{{ h.icon }}</span></th>
+              </sc-for>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ tableRows }}" as="r" hint-placeholder-count="6">
+              <tr style="cursor:pointer;border-bottom:1px solid #EFF2F6" style-hover="background:#F4F8FC">
+                <td class="num" style="padding:9px 12px;text-align:center;width:52px"><span style="display:inline-flex;width:22px;height:22px;align-items:center;justify-content:center;border-radius:2px;font-weight:600;background:{{ r.rankBg }};color:{{ r.rankFg }}">{{ r.rank }}</span></td>
+                <td style="padding:9px 12px;font-weight:600;color:#1D5A99">{{ r.name }}</td>
+                <td class="num" style="padding:9px 12px;text-align:right">{{ r.clues }}</td>
+                <td class="num" style="padding:9px 12px;text-align:right">{{ r.checked }}</td>
+                <td class="num" style="padding:9px 12px;text-align:right;font-weight:600">{{ r.rate }}%</td>
+                <td class="num" style="padding:9px 12px;text-align:right;font-weight:600">{{ r.tax }}</td>
+                <td class="num" style="padding:9px 12px;text-align:right">{{ r.days }}</td>
+                <td class="num" style="padding:9px 12px;text-align:right;color:{{ r.momColor }};font-weight:600">{{ r.mom }}</td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px">
+          <span style="color:#6E7C8B">共 12 个分局</span>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <button onClick="{{ prevPage }}" style="height:28px;min-width:28px;border:1px solid #D8DEE6;background:#fff;border-radius:2px;cursor:pointer;color:#5A6B7B;font-family:inherit" style-hover="border-color:#1D5A99;color:#1D5A99">‹</button>
+            <sc-for list="{{ pageBtns }}" as="p" hint-placeholder-count="2">
+              <button onClick="{{ p.click }}" class="num" style="height:28px;min-width:28px;border:1px solid {{ p.bd }};background:{{ p.bg }};color:{{ p.fg }};border-radius:2px;cursor:pointer;font-family:inherit" style-hover="border-color:#1D5A99">{{ p.n }}</button>
+            </sc-for>
+            <button onClick="{{ nextPage }}" style="height:28px;min-width:28px;border:1px solid #D8DEE6;background:#fff;border-radius:2px;cursor:pointer;color:#5A6B7B;font-family:inherit" style-hover="border-color:#1D5A99;color:#1D5A99">›</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ══ 悬浮提示框 ══ -->
+  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:{{ tipX }}px;top:{{ tipY }}px;z-index:99;pointer-events:none;background:rgba(22,39,55,.96);color:#fff;border-radius:3px;padding:10px 14px;min-width:190px;box-shadow:0 6px 20px rgba(28,39,51,.3)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.16);padding-bottom:5px">{{ tipTitle }}</div>
+      <sc-for list="{{ tipRows }}" as="t" hint-placeholder-count="3">
+        <div style="display:flex;justify-content:space-between;gap:18px;font-size:12px;line-height:1.9"><span style="color:#A9C0D4">{{ t.k }}</span><span class="num" style="font-weight:600">{{ t.v }}</span></div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;pageSize&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:6,&quot;min&quot;:4,&quot;max&quot;:12,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;排行表&quot;}}">
+class Component extends DCLogic {
+  state = {
+    openGroups: {'风险监控': true, '决策分析': true},
+    stage: 1, sortKey: 'tax', sortDir: -1, page: 0, tab: 0,
+    tip: null, timeOpen: false, distOpen: false, timeVal: '本年度', distVal: '全市'
+  };
+  fmt(n){ return n.toLocaleString('en-US'); }
+  setTip(e, title, rows){
+    const r = e.currentTarget.getBoundingClientRect();
+    let x = r.left + r.width/2 - 100, y = r.bottom + 10;
+    x = Math.max(12, Math.min(x, window.innerWidth - 240));
+    if (y > window.innerHeight - 170) y = r.top - 150;
+    this.setState({tip: {x, y, title, rows}});
+  }
+  renderVals(){
+    const S = this.state, fmt = this.fmt;
+    // ── 侧栏 ──
+    const GROUPS = [
+      {name:'领导驾驶舱', icon:'▤', href:'./领导驾驶舱.dc.html'},
+      {name:'风险监控', icon:'▦', items:[{name:'风险线索工作台', badge:'137', href:'./风险线索工作台.dc.html'},{name:'核查任务管理'},{name:'风险规则配置', href:'./规则库配置.dc.html'}]},
+      {name:'决策分析', icon:'▧', items:[{name:'收入分析', href:'./收入分析.dc.html'},{name:'税源分析', href:'./税源分析.dc.html'},{name:'治税成效分析', active:true},{name:'专题分析', href:'./专题分析.dc.html'},{name:'统计报表'}]},
+      {name:'数据资产', icon:'▥', items:[{name:'一户式档案', href:'./一户式档案详情.dc.html'},{name:'关联图谱分析', href:'./关联图谱分析.dc.html'}]},
+      {name:'智能应用', icon:'✦', items:[{name:'政策智能问答', href:'./政策智能问答.dc.html'}]},
+      {name:'系统管理', icon:'⚙'},
+    ];
+    const navGroups = GROUPS.map(g => {
+      const hasChildren = !!g.items, open = hasChildren && !!S.openGroups[g.name];
+      return {
+        name: g.name, icon: g.icon, hasChildren, open, chev: open ? '▾' : '▸',
+        fg: hasChildren ? '#C7D6E4' : '#C7D6E4',
+        toggle: () => hasChildren && this.setState(s => ({openGroups: {...s.openGroups, [g.name]: !s.openGroups[g.name]}})),
+        items: (g.items || []).map(it => ({
+          name: it.name, badge: it.badge || '',
+          fg: it.active ? '#fff' : '#A9C0D4', bg: it.active ? 'rgba(95,168,211,.16)' : 'transparent',
+          bar: it.active ? '#5FA8D3' : 'transparent', weight: it.active ? 600 : 400,
+          click: () => !it.active && it.href && (window.location.href = it.href)
+        }))
+      };
+    });
+    // ── 筛选 ──
+    const mkOpts = (list, cur, key, openKey) => list.map(n => ({
+      name: n, fg: n === cur ? '#1D5A99' : '#1C2733', bg: n === cur ? '#EEF4FA' : 'transparent',
+      click: () => this.setState({[key]: n, [openKey]: false})
+    }));
+    // ── 闭环漏斗 ──
+    const STAGES = [
+      {name:'规则命中', count:48672, unit:'条', sub:'214 条规则 · 9 个模型', days:'实时', color:'#8FBADB',
+       tip:[['本月新增','6,214 条'],['去重合并后','12,094 条'],['命中规则数','187 / 214 条']],
+       conn:{rate:'转化 19.1%', loss:'39,354', note:'排除 / 合并'}},
+      {name:'有效线索', count:9318, unit:'条', sub:'经初筛与人工确认', days:'1.2 天', color:'#5FA8D3',
+       tip:[['高风险','2,431 条'],['中风险','4,562 条'],['低风险','2,325 条']],
+       conn:{rate:'转化 70.2%', loss:'2,776', note:'待核查 / 超期'}},
+      {name:'已核查', count:6542, unit:'户', sub:'实地 + 案头核查', days:'8.6 天', color:'#3E7FB5',
+       tip:[['实地核查','2,187 户'],['案头核查','4,355 户'],['在办未结','1,204 户']],
+       conn:{rate:'查实 74.5%', loss:'1,669', note:'核查无问题'}},
+      {name:'已定性', count:4873, unit:'户', sub:'查实存在涉税问题', days:'3.4 天', color:'#1D5A99',
+       tip:[['补缴申报','3,912 户'],['行政处罚','645 户'],['移送稽查','316 户']],
+       conn:{rate:'入库 86.5%', loss:'658', note:'争议 / 分期在途'}},
+      {name:'税款入库', count:4215, unit:'户', sub:'累计入库 3.42 亿元', days:'5.1 天', color:'#16436F',
+       tip:[['查补税款','2.86 亿元'],['滞纳金罚款','0.56 亿元'],['户均入库','8.11 万元']]},
+    ];
+    const stages = STAGES.map((s, i) => {
+      const sel = S.stage === i;
+      return {
+        name: s.name, countFmt: fmt(s.count), unit: s.unit, sub: s.sub, days: s.days, color: s.color,
+        step: `0${i+1}`, stepFg: sel ? s.color : '#C4CDD6',
+        w: Math.max(8, Math.round(s.count / 48672 * 100)) + '%',
+        border: sel ? '1.5px solid #1D5A99' : '1px solid #D8DEE6',
+        bg: sel ? '#F7FAFD' : '#fff', shadow: sel ? '0 3px 10px rgba(29,90,153,.14)' : 'none',
+        conn: !!s.conn, connRate: s.conn?.rate, connLoss: s.conn?.loss, connNote: s.conn?.note,
+        click: () => this.setState({stage: i}),
+        enter: (e) => this.setTip(e, `${s.name} · ${fmt(s.count)} ${s.unit}`, s.tip.map(t => ({k: t[0], v: t[1]})))
+      };
+    });
+    // ── 下钻 ──
+    const DRILL = [
+      {note:'口径:本年度累计命中(去重前)', cols:[
+        ['按数据源',[['发票数据',18420],['电力能耗',9860],['不动产登记',7420],['银行大额流水',5210]]],
+        ['按区县',[['城东区',9840],['高新区',8620],['城西区',7410],['经开区',6280]]],
+        ['按命中规则 TOP4',[['进销项背离',6240],['电力税收弹性异常',4180],['房土两税漏征',3560],['虚开发票特征',2870]]]]},
+      {note:'口径:初筛 + 人工确认后的有效线索', cols:[
+        ['按数据源',[['发票数据',3120],['电力能耗',2140],['不动产登记',1680],['银行大额流水',1240]]],
+        ['按区县',[['城东区',1860],['高新区',1720],['城西区',1450],['经开区',1180]]],
+        ['按风险等级',[['高风险',2431],['中风险',4562],['低风险',2325],['待复核',0]]]]},
+      {note:'口径:已完成核查程序的户数', cols:[
+        ['按核查方式',[['案头核查',4355],['实地核查',2187],['约谈自查',1420],['联合检查',380]]],
+        ['按区县',[['城东区',1320],['高新区',1180],['城西区',1040],['经开区',860]]],
+        ['按行业',[['批发零售',1980],['建筑房地产',1560],['制造业',1240],['现代服务',920]]]]},
+      {note:'口径:查实存在涉税问题并已定性', cols:[
+        ['按定性类型',[['补缴申报',3912],['行政处罚',645],['移送稽查',316],['其他',0]]],
+        ['按区县',[['城东区',1020],['高新区',890],['城西区',760],['经开区',640]]],
+        ['按行业',[['批发零售',1510],['建筑房地产',1230],['制造业',940],['现代服务',680]]]]},
+      {note:'口径:税款(含滞纳金罚款)实际入库', cols:[
+        ['按税种(万元)',[['增值税',13860],['企业所得税',9420],['个人所得税',4210],['土地增值税',3350]]],
+        ['按区县(万元)',[['城东区',7840],['高新区',6920],['城西区',5480],['经开区',4360]]],
+        ['按入库方式',[['自行补缴',2870],['责令追缴',984],['强制执行',245],['分期入库',116]]]]},
+    ];
+    const dSel = DRILL[S.stage];
+    const drillCols = dSel.cols.map(c => {
+      const max = Math.max(...c[1].map(r => r[1]), 1);
+      return {title: c[0], rows: c[1].map(r => ({name: r[0], val: fmt(r[1]), w: Math.round(r[1]/max*100)+'%'}))};
+    });
+    // ── 数据源贡献 ──
+    const SRC = [
+      {name:'发票全量数据', val:6420, clues:3120, rate:76.4},
+      {name:'电力能耗数据', val:4860, clues:2140, rate:71.2},
+      {name:'不动产登记', val:3150, clues:1680, rate:68.9},
+      {name:'银行大额流水', val:2740, clues:1240, rate:74.8},
+      {name:'社保参保数据', val:1980, clues:860, rate:61.5},
+      {name:'互联网平台经营', val:1560, clues:720, rate:58.3},
+    ];
+    const srcBars = SRC.map((s, i) => ({
+      name: s.name, valFmt: fmt(s.val), w: Math.round(s.val/6420*100)+'%', op: 1 - i*0.09,
+      enter: (e) => this.setTip(e, s.name, [
+        {k:'入库税款', v: fmt(s.val)+' 万元'}, {k:'有效线索', v: fmt(s.clues)+' 条'}, {k:'查实率', v: s.rate+'%'}])
+    }));
+    // ── 规则 vs 模型 ──
+    const CMP = [
+      {name:'查实率对比', unit:'%', summary:'模型平均查实率高 9.4 个百分点',
+       cats:['增值税','企业所得税','个人所得税','土地增值税','房产税'], rule:[68,62,55,71,64], model:[79,74,70,66,72]},
+      {name:'入库贡献', unit:'万元', summary:'规则引擎贡献占比 58.2%',
+       cats:['增值税','企业所得税','个人所得税','土地增值税','房产税'], rule:[5210,3860,1240,980,760], model:[3120,2540,1890,640,540]},
+      {name:'耗时对比', unit:'天', summary:'模型线索平均结案快 3.3 天',
+       cats:['增值税','企业所得税','个人所得税','土地增值税','房产税'], rule:[9.8,11.2,8.4,12.6,10.1], model:[6.2,7.4,5.8,9.1,7.0]},
+    ];
+    const cmpSel = CMP[S.tab];
+    const cmpMax = Math.max(...cmpSel.rule, ...cmpSel.model);
+    const cmpGroups = cmpSel.cats.map((cat, i) => ({
+      cat, h1: Math.round(cmpSel.rule[i]/cmpMax*180), h2: Math.round(cmpSel.model[i]/cmpMax*180),
+      enter: (e) => this.setTip(e, `${cat} · ${cmpSel.name}`, [
+        {k:'规则引擎', v: fmt(cmpSel.rule[i])+' '+cmpSel.unit},
+        {k:'智能模型', v: fmt(cmpSel.model[i])+' '+cmpSel.unit},
+        {k:'差值', v: (Math.round((cmpSel.model[i]-cmpSel.rule[i])*10)/10 > 0 ? '+' : '') + Math.round((cmpSel.model[i]-cmpSel.rule[i])*10)/10 + ' ' + cmpSel.unit}])
+    }));
+    const tabs = CMP.map((t, i) => ({
+      name: t.name, click: () => this.setState({tab: i}),
+      bg: S.tab === i ? '#1D5A99' : '#fff', fg: S.tab === i ? '#fff' : '#5A6B7B',
+      bl: i > 0 ? '1px solid #D8DEE6' : 'none'
+    }));
+    // ── 分局排行 ──
+    const BUREAUS = [
+      ['城东分局',1860,1320,78.2,7840,10.4,'+12.6%'],['高新区分局',1720,1180,81.5,6920,9.2,'+18.3%'],
+      ['城西分局',1450,1040,72.8,5480,11.6,'+6.4%'],['经开区分局',1180,860,74.1,4360,10.8,'+9.1%'],
+      ['城南分局',940,690,69.4,3210,12.3,'-2.8%'],['城北分局',860,610,66.2,2870,13.1,'+4.2%'],
+      ['临港分局',620,450,71.8,2340,11.9,'+15.7%'],['江北分局',540,390,63.5,1860,14.2,'-5.1%'],
+      ['湖滨分局',480,340,67.9,1640,12.8,'+3.6%'],['老城分局',420,300,61.2,1380,15.4,'-1.9%'],
+      ['铁西分局',380,270,64.8,1210,13.7,'+7.8%'],['直属一分局',310,220,70.3,980,10.9,'+11.2%'],
+    ];
+    const KEYS = ['name','clues','checked','rate','tax','days','mom'];
+    const HEADS = [
+      {label:'排名', key:null, align:'center'},{label:'分局', key:'name', align:'left'},
+      {label:'有效线索', key:'clues', align:'right'},{label:'已核查(户)', key:'checked', align:'right'},
+      {label:'查实率', key:'rate', align:'right'},{label:'入库税款(万元)', key:'tax', align:'right'},
+      {label:'户均耗时(天)', key:'days', align:'right'},{label:'环比', key:'mom', align:'right'},
+    ];
+    const momNum = s => parseFloat(s);
+    let rows = BUREAUS.map(b => ({name:b[0], clues:b[1], checked:b[2], rate:b[3], tax:b[4], days:b[5], mom:b[6]}));
+    const taxRank = [...rows].sort((a,b) => b.tax - a.tax).map(r => r.name);
+    if (S.sortKey) rows.sort((a, b) => {
+      const k = S.sortKey;
+      const av = k === 'mom' ? momNum(a[k]) : a[k], bv = k === 'mom' ? momNum(b[k]) : b[k];
+      return (typeof av === 'string' ? av.localeCompare(bv, 'zh') : av - bv) * S.sortDir;
+    });
+    const pageSize = Math.max(1, this.props.pageSize ?? 6);
+    const pages = Math.ceil(rows.length / pageSize);
+    const page = Math.min(S.page, pages - 1);
+    const tableRows = rows.slice(page*pageSize, (page+1)*pageSize).map(r => {
+      const rank = taxRank.indexOf(r.name) + 1;
+      return {
+        name: r.name, clues: fmt(r.clues), checked: fmt(r.checked), rate: r.rate,
+        tax: fmt(r.tax), days: r.days, mom: r.mom, rank,
+        rankBg: rank <= 3 ? '#1D5A99' : '#EAEEF3', rankFg: rank <= 3 ? '#fff' : '#5A6B7B',
+        momColor: r.mom.startsWith('+') ? '#1E7F4F' : '#C0392B'
+      };
+    });
+    const tableHeads = HEADS.map(h => ({
+      label: h.label, align: h.align,
+      icon: h.key ? (S.sortKey === h.key ? (S.sortDir === 1 ? '▲' : '▼') : '⇅') : '',
+      iconColor: S.sortKey === h.key ? '#1D5A99' : '#B6C0CA',
+      click: () => h.key && this.setState(s => ({
+        sortKey: h.key, sortDir: s.sortKey === h.key ? -s.sortDir : (h.key === 'name' ? 1 : -1), page: 0
+      }))
+    }));
+    const pageBtns = Array.from({length: pages}, (_, i) => ({
+      n: i + 1, click: () => this.setState({page: i}),
+      bg: i === page ? '#1D5A99' : '#fff', fg: i === page ? '#fff' : '#5A6B7B', bd: i === page ? '#1D5A99' : '#D8DEE6'
+    }));
+    return {
+      navGroups,
+      timeVal: S.timeVal, distVal: S.distVal, timeOpen: S.timeOpen, distOpen: S.distOpen,
+      timeToggle: () => this.setState(s => ({timeOpen: !s.timeOpen, distOpen: false})),
+      distToggle: () => this.setState(s => ({distOpen: !s.distOpen, timeOpen: false})),
+      timeOptions: mkOpts(['本月','本季度','本年度','近 12 个月','自定义…'], S.timeVal, 'timeVal', 'timeOpen'),
+      distOptions: mkOpts(['全市','城东区','城西区','城南区','城北区','高新区','经开区','临港新区'], S.distVal, 'distVal', 'distOpen'),
+      stages, tipLeave: () => this.setState({tip: null}),
+      drillTitle: STAGES[S.stage].name, drillColor: STAGES[S.stage].color, drillNote: dSel.note, drillCols,
+      srcBars, tabs, tabSummary: cmpSel.summary, cmpGroups,
+      tableHeads, tableRows, pageBtns,
+      prevPage: () => this.setState(s => ({page: Math.max(0, s.page - 1)})),
+      nextPage: () => this.setState(s => ({page: Math.min(pages - 1, s.page + 1)})),
+      tipShow: !!S.tip, tipX: S.tip?.x ?? 0, tipY: S.tip?.y ?? 0,
+      tipTitle: S.tip?.title ?? '', tipRows: S.tip?.rows ?? []
+    };
+  }
+}
+</script>
+</body>
+</html>

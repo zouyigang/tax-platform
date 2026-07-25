@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:#EEF1F5;color:#1C2733;font-family:"Microsoft YaHei","微软雅黑","PingFang SC","Source Han Sans SC","Noto Sans SC",system-ui,sans-serif;font-size:14px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:#1D5A99;text-decoration:none}
+  a:hover{color:#16436F;text-decoration:underline}
+  .num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+</style>
+</helmet>
+<div data-screen-label="专题分析" style="display:flex;min-height:100vh;background:#EEF1F5;min-width:1280px">
+
+  <nav style="width:210px;flex:none;position:sticky;top:0;height:100vh;background:#16436F;color:#C7D6E4;display:flex;flex-direction:column">
+    <div style="height:56px;flex:none;display:flex;align-items:center;gap:10px;padding:0 16px;border-bottom:1px solid rgba(255,255,255,.08)">
+      <div style="width:28px;height:28px;background:#5FA8D3;color:#16436F;border-radius:2px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex:none">税</div>
+      <div style="font-size:14px;font-weight:600;color:#fff;line-height:1.25">智慧综合治税<br><span style="font-size:11px;font-weight:400;color:#8FAAC4">风险智能分析平台</span></div>
+    </div>
+    <div style="flex:1;overflow:auto;padding:8px 0">
+      <sc-for list="{{ navGroups }}" as="g" hint-placeholder-count="5">
+        <div>
+          <div onClick="{{ g.toggle }}" style="display:flex;align-items:center;gap:10px;height:40px;padding:0 16px;font-size:14px;cursor:pointer;color:#C7D6E4" style-hover="color:#fff">
+            <span style="width:16px;text-align:center;opacity:.85">{{ g.icon }}</span>
+            <span style="flex:1">{{ g.name }}</span>
+            <sc-if value="{{ g.hasChildren }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size:10px;color:#7E9AB4">{{ g.chev }}</span>
+            </sc-if>
+          </div>
+          <sc-if value="{{ g.open }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="2">
+                <div onClick="{{ it.click }}" style="display:flex;align-items:center;gap:8px;height:38px;padding:0 16px 0 42px;font-size:13px;cursor:pointer;color:{{ it.fg }};background:{{ it.bg }};border-left:3px solid {{ it.bar }};font-weight:{{ it.weight }}" style-hover="color:#fff">
+                  <span style="flex:1">{{ it.name }}</span>
+                  <sc-if value="{{ it.badge }}" hint-placeholder-val="{{ false }}">
+                    <span class="num" style="font-size:11px;background:#C0392B;color:#fff;border-radius:9px;padding:0 7px">{{ it.badge }}</span>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:12px;color:#7E9AB4">v1.0 · 政务内网</div>
+  </nav>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <header style="position:sticky;top:0;z-index:30;height:56px;flex:none;background:#fff;border-bottom:1px solid #D8DEE6;display:flex;align-items:center;padding:0 24px;gap:12px">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#6E7C8B">
+        <a href="#" style="color:#6E7C8B">首页</a><span style="color:#B6C0CA">/</span>
+        <a href="#" style="color:#6E7C8B">决策分析</a><span style="color:#B6C0CA">/</span>
+        <span style="color:#1C2733;font-weight:600">专题分析</span>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+        <span class="num" style="font-size:12px;color:#97A3B0;margin-right:6px">数据更新 2026-07-24 08:00</span>
+        <div style="position:relative">
+          <div onClick="{{ timeToggle }}" style="min-width:126px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">时间</span><span>{{ timeVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ timeOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0">
+              <sc-for list="{{ timeOptions }}" as="o" hint-placeholder-count="4">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <div style="position:relative">
+          <div onClick="{{ distToggle }}" style="min-width:112px;height:32px;padding:0 10px;border:1px solid #D8DEE6;border-radius:2px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;background:#fff;cursor:pointer" style-hover="border-color:#1D5A99">
+            <span style="color:#97A3B0;font-size:12px">区县</span><span>{{ distVal }}</span><span style="color:#97A3B0;font-size:10px">▾</span>
+          </div>
+          <sc-if value="{{ distOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;top:36px;left:0;right:0;background:#fff;border:1px solid #D8DEE6;border-radius:2px;box-shadow:0 4px 14px rgba(28,39,51,.12);z-index:40;padding:4px 0;max-height:260px;overflow:auto">
+              <sc-for list="{{ distOptions }}" as="o" hint-placeholder-count="5">
+                <div onClick="{{ o.click }}" style="padding:7px 12px;font-size:13px;cursor:pointer;color:{{ o.fg }};background:{{ o.bg }}" style-hover="background:#EEF4FA">{{ o.name }}</div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <button style="height:32px;padding:0 14px;border:1px solid #1D5A99;border-radius:2px;background:#1D5A99;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit" style-hover="background:#16436F;border-color:#16436F"><span style="font-size:14px">⤓</span> 导出</button>
+      </div>
+    </header>
+
+    <!-- ── 专题切换 ── -->
+    <div style="background:#fff;border-bottom:1px solid #D8DEE6;padding:0 24px;display:flex;gap:4px">
+      <sc-for list="{{ topics }}" as="t" hint-placeholder-count="3">
+        <div onClick="{{ t.click }}" style="padding:13px 22px 11px;font-size:15px;cursor:pointer;color:{{ t.fg }};font-weight:{{ t.weight }};border-bottom:3px solid {{ t.bar }}" style-hover="color:#1D5A99">{{ t.name }}<span class="num" style="font-size:12px;color:#C0392B;margin-left:6px;font-weight:400">{{ t.risk }}</span></div>
+      </sc-for>
+      <span style="margin-left:auto;align-self:center;font-size:12px;color:#97A3B0">专题口径由税政部门维护 · 每月 5 日更新</span>
+    </div>
+
+    <main style="padding:20px 24px 40px;display:flex;flex-direction:column;gap:20px">
+
+      <!-- ════ 房地产专题 ════ -->
+      <sc-if value="{{ isRE }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+            <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:16px">
+              <h2 style="font-size:16px;font-weight:600;margin:0">房地产全环节税收链条</h2>
+              <span style="font-size:12px;color:#97A3B0">点击环节节点展开税种明细与风险提示</span>
+              <span class="num" style="margin-left:auto;font-size:13px;color:#1C2733;font-weight:600">专题税收合计 21.4 亿元 · 占全市 25.8%</span>
+            </div>
+            <div style="display:flex;align-items:stretch;gap:0">
+              <sc-for list="{{ reNodes }}" as="n" hint-placeholder-count="6">
+                <div style="display:contents">
+                  <div onClick="{{ n.click }}" style="flex:1;min-width:0;border:{{ n.border }};background:{{ n.bg }};border-radius:2px;padding:12px 14px;cursor:pointer;position:relative" style-hover="border-color:#1D5A99">
+                    <sc-if value="{{ n.riskN }}" hint-placeholder-val="{{ false }}">
+                      <span class="num" style="position:absolute;top:-9px;right:-7px;background:#C0392B;color:#fff;font-size:11px;border-radius:9px;padding:0 7px;border:2px solid #fff">{{ n.riskN }}</span>
+                    </sc-if>
+                    <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:14px;font-weight:600">{{ n.name }}</span><span style="font-size:11px;color:#97A3B0">{{ n.chev }}</span></div>
+                    <div class="num" style="font-size:22px;font-weight:600;color:#1D5A99;line-height:1.5">{{ n.amt }}<span style="font-size:12px;font-weight:400;color:#6E7C8B;margin-left:3px">亿元</span></div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+                      <sc-for list="{{ n.taxes }}" as="tx" hint-placeholder-count="3">
+                        <span style="font-size:11px;color:#416180;background:#EEF4FA;border-radius:2px;padding:0 6px;white-space:nowrap">{{ tx }}</span>
+                      </sc-for>
+                    </div>
+                  </div>
+                  <sc-if value="{{ n.hasArrow }}" hint-placeholder-val="{{ false }}">
+                    <div style="width:34px;flex:none;display:flex;align-items:center;justify-content:center;color:#B6C0CA;font-size:18px">→</div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+            <!-- 展开的环节详情 -->
+            <div style="margin-top:16px;border-top:1px solid #EAEEF3;padding-top:14px;display:grid;grid-template-columns:1.3fr 1fr;gap:28px">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="width:3px;height:14px;background:#1D5A99"></span><span style="font-size:14px;font-weight:600">{{ reSelName }} · 税种明细</span></div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px">
+                  <thead><tr>
+                    <th style="text-align:left;padding:7px 10px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600">税种</th>
+                    <th style="text-align:right;padding:7px 10px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600">应征(万元)</th>
+                    <th style="text-align:right;padding:7px 10px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600">已入库(万元)</th>
+                    <th style="text-align:right;padding:7px 10px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600">差异</th>
+                  </tr></thead>
+                  <tbody>
+                    <sc-for list="{{ reSelTaxes }}" as="r" hint-placeholder-count="4">
+                      <tr style="border-bottom:1px solid #EFF2F6;cursor:pointer" style-hover="background:#F4F8FC">
+                        <td style="padding:7px 10px;color:#1D5A99;font-weight:600">{{ r.name }}</td>
+                        <td class="num" style="padding:7px 10px;text-align:right">{{ r.due }}</td>
+                        <td class="num" style="padding:7px 10px;text-align:right">{{ r.paid }}</td>
+                        <td class="num" style="padding:7px 10px;text-align:right;font-weight:600;color:{{ r.gapColor }}">{{ r.gap }}</td>
+                      </tr>
+                    </sc-for>
+                  </tbody>
+                </table>
+              </div>
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="width:3px;height:14px;background:#C0392B"></span><span style="font-size:14px;font-weight:600">风险提示({{ reSelRiskN }})</span></div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ reSelRisks }}" as="r" hint-placeholder-count="3">
+                    <div style="display:flex;gap:10px;align-items:flex-start;border:1px solid #EFF2F6;border-radius:2px;padding:8px 12px;cursor:pointer" style-hover="border-color:#1D5A99;background:#F7FAFD">
+                      <span style="font-size:11px;color:#fff;background:{{ r.hex }};border-radius:2px;padding:0 6px;flex:none;margin-top:3px">{{ r.lv }}</span>
+                      <div style="min-width:0"><div style="font-size:13px;font-weight:600">{{ r.title }}</div><div style="font-size:12px;color:#6E7C8B">{{ r.note }}</div></div>
+                      <span class="num" style="margin-left:auto;flex:none;font-size:12px;color:#C0392B;font-weight:600">{{ r.n }} 户</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+              <h2 style="font-size:16px;font-weight:600;margin:0">重点房企项目监控</h2>
+              <span style="font-size:12px;color:#97A3B0">按清算风险排序 · 行可点击查看一户式档案</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr>
+                <sc-for list="{{ reProjHeads }}" as="h" hint-placeholder-count="7">
+                  <th style="text-align:{{ h.align }};padding:9px 12px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600;white-space:nowrap">{{ h.label }}</th>
+                </sc-for>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ reProjects }}" as="p" hint-placeholder-count="5">
+                  <tr style="cursor:pointer;border-bottom:1px solid #EFF2F6" style-hover="background:#F4F8FC">
+                    <td style="padding:9px 12px;font-weight:600;color:#1D5A99">{{ p.name }}</td>
+                    <td style="padding:9px 12px">{{ p.dev }}</td>
+                    <td style="padding:9px 12px">{{ p.stage }}</td>
+                    <td class="num" style="padding:9px 12px;text-align:right">{{ p.sale }}</td>
+                    <td style="padding:9px 12px;text-align:right"><div style="display:inline-flex;align-items:center;gap:8px"><div style="width:80px;height:8px;background:#EAEEF3;border-radius:1px"><div style="height:8px;width:{{ p.pw }};background:#1D5A99;border-radius:1px"></div></div><span class="num" style="width:40px;text-align:right">{{ p.prog }}%</span></div></td>
+                    <td class="num" style="padding:9px 12px;text-align:right;font-weight:600">{{ p.tax }}</td>
+                    <td style="padding:9px 12px;text-align:center"><span style="font-size:12px;color:#fff;background:{{ p.riskHex }};border-radius:2px;padding:1px 8px">{{ p.risk }}</span></td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ════ 建筑安装专题 ════ -->
+      <sc-if value="{{ isCON }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:20px">
+            <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+              <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:6px">
+                <h2 style="font-size:16px;font-weight:600;margin:0">在建项目合规象限 · 预缴率 × 开票进度</h2>
+                <span style="font-size:12px;color:#97A3B0">气泡:合同金额 · 右下阴影为风险区(开票快、预缴低)</span>
+              </div>
+              <svg viewBox="0 0 760 340" style="width:100%;display:block">
+                <rect x="404" y="150" width="306" height="150" fill="#C0392B" fill-opacity="0.06"></rect>
+                <text x="700" y="292" text-anchor="end" font-size="11" fill="#C0392B">风险区</text>
+                <line x1="52" y1="10" x2="52" y2="300" stroke="#D8DEE6" stroke-width="1"></line>
+                <line x1="52" y1="300" x2="710" y2="300" stroke="#D8DEE6" stroke-width="1"></line>
+                <line x1="404" y1="10" x2="404" y2="300" stroke="#C4CDD6" stroke-width="1" stroke-dasharray="4 3"></line>
+                <line x1="52" y1="150" x2="710" y2="150" stroke="#C4CDD6" stroke-width="1" stroke-dasharray="4 3"></line>
+                <sc-for list="{{ conXT }}" as="t" hint-placeholder-count="5">
+                  <text x="{{ t.x }}" y="316" text-anchor="middle" font-size="11" fill="#97A3B0" class="num">{{ t.label }}</text>
+                </sc-for>
+                <sc-for list="{{ conYT }}" as="t" hint-placeholder-count="5">
+                  <text x="46" y="{{ t.y }}" text-anchor="end" font-size="11" fill="#97A3B0" class="num">{{ t.label }}</text>
+                </sc-for>
+                <text x="710" y="334" text-anchor="end" font-size="11" fill="#6E7C8B">开票进度 →</text>
+                <text x="20" y="20" font-size="11" fill="#6E7C8B">预缴率 ↑</text>
+                <sc-for list="{{ conPts }}" as="p" hint-placeholder-count="14">
+                  <circle onMouseEnter="{{ p.enter }}" onMouseLeave="{{ tipLeave }}" cx="{{ p.x }}" cy="{{ p.y }}" r="{{ p.r }}" fill="{{ p.hex }}" fill-opacity="0.4" stroke="{{ p.hex }}" stroke-width="1.5" style="cursor:pointer"></circle>
+                </sc-for>
+              </svg>
+            </section>
+            <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px;display:flex;flex-direction:column;gap:12px">
+              <h2 style="font-size:16px;font-weight:600;margin:0">专题概览</h2>
+              <sc-for list="{{ conStats }}" as="k" hint-placeholder-count="4">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;border-bottom:1px solid #EFF2F6;padding-bottom:10px">
+                  <span style="font-size:13px;color:#5A6B7B">{{ k.label }}</span>
+                  <span><span class="num" style="font-size:22px;font-weight:600;color:{{ k.color }}">{{ k.value }}</span><span style="font-size:12px;color:#97A3B0;margin-left:4px">{{ k.unit }}</span></span>
+                </div>
+              </sc-for>
+              <div style="font-size:12px;color:#6E7C8B;background:#F4F6F9;border-radius:2px;padding:8px 10px;margin-top:auto">跨区域项目按 2% 预缴口径监控;外埠施工企业 87 个项目中 23 个预缴率低于阈值,已生成风险线索推送属地分局</div>
+            </section>
+          </div>
+          <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px">
+              <h2 style="font-size:16px;font-weight:600;margin:0">风险项目清单</h2>
+              <span style="font-size:12px;color:#97A3B0">仅显示落入风险区的项目 · 行可点击发起核查</span>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px">
+              <thead><tr>
+                <sc-for list="{{ conHeads }}" as="h" hint-placeholder-count="7">
+                  <th style="text-align:{{ h.align }};padding:9px 12px;background:#F4F6F9;border-bottom:1px solid #D8DEE6;color:#5A6B7B;font-weight:600;white-space:nowrap">{{ h.label }}</th>
+                </sc-for>
+              </tr></thead>
+              <tbody>
+                <sc-for list="{{ conRisky }}" as="r" hint-placeholder-count="5">
+                  <tr style="cursor:pointer;border-bottom:1px solid #EFF2F6" style-hover="background:#F4F8FC">
+                    <td style="padding:9px 12px;font-weight:600;color:#1D5A99">{{ r.name }}</td>
+                    <td style="padding:9px 12px">{{ r.corp }}</td>
+                    <td style="padding:9px 12px">{{ r.dist }}</td>
+                    <td class="num" style="padding:9px 12px;text-align:right">{{ r.amt }}</td>
+                    <td class="num" style="padding:9px 12px;text-align:right">{{ r.inv }}%</td>
+                    <td class="num" style="padding:9px 12px;text-align:right;font-weight:600;color:#C0392B">{{ r.pre }}%</td>
+                    <td class="num" style="padding:9px 12px;text-align:right;font-weight:600;color:#C0392B">{{ r.gap }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </sc-if>
+
+      <!-- ════ 平台经济专题 ════ -->
+      <sc-if value="{{ isPLT }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+            <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:14px">
+              <h2 style="font-size:16px;font-weight:600;margin:0">重点平台监测 · 涉税数据报送与商户申报</h2>
+              <span style="font-size:12px;color:#97A3B0">点击平台卡片查看商户申报分布</span>
+              <span class="num" style="margin-left:auto;font-size:13px;color:#1C2733;font-weight:600">监测平台 12 家 · 入驻商户 36,420 户</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">
+              <sc-for list="{{ platCards }}" as="p" hint-placeholder-count="4">
+                <div onClick="{{ p.click }}" style="border:{{ p.border }};background:{{ p.bg }};border-radius:2px;padding:14px 16px;cursor:pointer" style-hover="border-color:#1D5A99">
+                  <div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:14px;font-weight:600">{{ p.name }}</span><span style="font-size:11px;color:#416180;background:#EEF4FA;border-radius:2px;padding:0 6px">{{ p.type }}</span></div>
+                  <div style="display:flex;gap:18px;margin-top:8px">
+                    <div><div style="font-size:11px;color:#97A3B0">入驻商户</div><div class="num" style="font-size:18px;font-weight:600">{{ p.merchants }}</div></div>
+                    <div><div style="font-size:11px;color:#97A3B0">风险商户</div><div class="num" style="font-size:18px;font-weight:600;color:#C0392B">{{ p.riskN }}</div></div>
+                  </div>
+                  <div style="margin-top:10px">
+                    <div style="display:flex;justify-content:space-between;font-size:11px;color:#6E7C8B;margin-bottom:3px"><span>商户申报率</span><span class="num" style="font-weight:600;color:{{ p.rateColor }}">{{ p.rate }}%</span></div>
+                    <div style="height:8px;background:#EAEEF3;border-radius:1px"><div style="height:8px;width:{{ p.rateW }};background:{{ p.rateColor }};border-radius:1px"></div></div>
+                  </div>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <div style="display:grid;grid-template-columns:1.15fr 1fr;gap:20px">
+            <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px">
+                <h2 style="font-size:16px;font-weight:600;margin:0">{{ platSelName }} · 商户年销售额分布与申报缺口</h2>
+                <span style="font-size:12px;color:#97A3B0">灰:平台报送商户数 蓝:已申报商户数</span>
+              </div>
+              <div style="display:flex;align-items:flex-end;gap:18px;height:210px;border-bottom:1px solid #D8DEE6;padding:0 8px">
+                <sc-for list="{{ platBins }}" as="b" hint-placeholder-count="6">
+                  <div onMouseEnter="{{ b.enter }}" onMouseLeave="{{ tipLeave }}" style="flex:1;display:flex;align-items:flex-end;justify-content:center;gap:5px;height:100%;cursor:pointer;padding:0 6px" style-hover="background:#F4F8FC">
+                    <div style="width:26px;height:{{ b.h1 }}px;background:#C4CDD6;border-radius:1px 1px 0 0"></div>
+                    <div style="width:26px;height:{{ b.h2 }}px;background:#1D5A99;border-radius:1px 1px 0 0"></div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="display:flex;padding:6px 8px 0">
+                <sc-for list="{{ platBins }}" as="b" hint-placeholder-count="6">
+                  <div style="flex:1;text-align:center;font-size:11px;color:#6E7C8B">{{ b.label }}</div>
+                </sc-for>
+              </div>
+              <div style="font-size:12px;color:#6E7C8B;margin-top:8px">申报缺口集中在年销售额 10–50 万区间;达到起征点未申报商户 <span class="num" style="color:#C0392B;font-weight:600">{{ platGapN }}</span> 户,预估税款 <span class="num" style="color:#C0392B;font-weight:600">{{ platGapTax }}</span> 万元</div>
+            </section>
+            <section style="background:#fff;border:1px solid #D8DEE6;border-radius:2px;padding:18px 22px">
+              <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px">
+                <h2 style="font-size:16px;font-weight:600;margin:0">未申报商户 TOP</h2>
+                <span style="font-size:12px;color:#97A3B0">按平台报送销售额排序</span>
+              </div>
+              <div style="display:flex;flex-direction:column">
+                <sc-for list="{{ platTop }}" as="m" hint-placeholder-count="6">
+                  <div style="display:flex;align-items:center;gap:12px;padding:8px 6px;border-bottom:1px solid #EFF2F6;cursor:pointer;font-size:13px" style-hover="background:#F4F8FC">
+                    <span class="num" style="width:18px;color:#97A3B0;font-weight:600">{{ m.rank }}</span>
+                    <div style="flex:1;min-width:0"><div style="font-weight:600;color:#1D5A99;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</div><div style="font-size:11px;color:#97A3B0">{{ m.cat }}</div></div>
+                    <span class="num" style="font-weight:600">{{ m.sale }} 万</span>
+                    <span style="font-size:11px;color:#fff;background:{{ m.hex }};border-radius:2px;padding:1px 7px;flex:none">{{ m.lv }}</span>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top:12px;text-align:right"><a href="./风险线索工作台.dc.html" style="font-size:13px">转入风险线索工作台 ›</a></div>
+            </section>
+          </div>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <sc-if value="{{ tipShow }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;left:{{ tipX }}px;top:{{ tipY }}px;z-index:99;pointer-events:none;background:rgba(22,39,55,.96);color:#fff;border-radius:3px;padding:10px 14px;min-width:190px;box-shadow:0 6px 20px rgba(28,39,51,.3)">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;border-bottom:1px solid rgba(255,255,255,.16);padding-bottom:5px">{{ tipTitle }}</div>
+      <sc-for list="{{ tipRows }}" as="t" hint-placeholder-count="3">
+        <div style="display:flex;justify-content:space-between;gap:18px;font-size:12px;line-height:1.9"><span style="color:#A9C0D4">{{ t.k }}</span><span class="num" style="font-weight:600">{{ t.v }}</span></div>
+      </sc-for>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTopic&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;房地产&quot;,&quot;options&quot;:[&quot;房地产&quot;,&quot;建筑安装&quot;,&quot;平台经济&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;专题&quot;}}">
+class Component extends DCLogic {
+  state = {openGroups: {'决策分析': true}, topic: 0, reSel: 2, platSel: 0, tip: null, timeOpen: false, distOpen: false, timeVal: '本年度', distVal: '全市'};
+  componentDidMount(){
+    const t = {'房地产': 0, '建筑安装': 1, '平台经济': 2}[this.props.defaultTopic];
+    if (t) this.setState({topic: t});
+  }
+  setTip(e, title, rows){
+    const r = e.currentTarget.getBoundingClientRect();
+    let x = r.left + r.width/2 - 100, y = r.bottom + 10;
+    x = Math.max(12, Math.min(x, window.innerWidth - 240));
+    if (y > window.innerHeight - 170) y = r.top - 150;
+    this.setState({tip: {x, y, title, rows}});
+  }
+  navGroups(active){
+    const S = this.state;
+    const GROUPS = [
+      {name:'领导驾驶舱', icon:'▤', href:'./领导驾驶舱.dc.html'},
+      {name:'风险监控', icon:'▦', items:[{name:'风险线索工作台', badge:'137', href:'./风险线索工作台.dc.html'},{name:'核查任务管理'},{name:'风险规则配置', href:'./规则库配置.dc.html'}]},
+      {name:'决策分析', icon:'▧', items:[{name:'收入分析', href:'./收入分析.dc.html'},{name:'税源分析', href:'./税源分析.dc.html'},{name:'治税成效分析', href:'./治税成效分析.dc.html'},{name:'专题分析', href:'./专题分析.dc.html'},{name:'统计报表'}]},
+      {name:'数据资产', icon:'▥', items:[{name:'一户式档案', href:'./一户式档案详情.dc.html'},{name:'关联图谱分析', href:'./关联图谱分析.dc.html'}]},
+      {name:'智能应用', icon:'✦', items:[{name:'政策智能问答', href:'./政策智能问答.dc.html'}]},
+      {name:'系统管理', icon:'⚙'},
+    ];
+    return GROUPS.map(g => {
+      const hasChildren = !!g.items, open = hasChildren && !!S.openGroups[g.name];
+      return {
+        name: g.name, icon: g.icon, hasChildren, open, chev: open ? '▾' : '▸',
+        toggle: () => hasChildren ? this.setState(s => ({openGroups: {...s.openGroups, [g.name]: !s.openGroups[g.name]}})) : (g.href && (window.location.href = g.href)),
+        items: (g.items || []).map(it => {
+          const on = it.name === active;
+          return {name: it.name, badge: it.badge || '',
+            fg: on ? '#fff' : '#A9C0D4', bg: on ? 'rgba(95,168,211,.16)' : 'transparent',
+            bar: on ? '#5FA8D3' : 'transparent', weight: on ? 600 : 400,
+            click: () => !on && it.href && (window.location.href = it.href)};
+        })
+      };
+    });
+  }
+  renderVals(){
+    const S = this.state, fmt = n => n.toLocaleString('en-US');
+    const mkOpts = (list, cur, key, openKey) => list.map(n => ({
+      name: n, fg: n === cur ? '#1D5A99' : '#1C2733', bg: n === cur ? '#EEF4FA' : 'transparent',
+      click: () => this.setState({[key]: n, [openKey]: false})
+    }));
+    const topics = [{name:'房地产', risk:'46'},{name:'建筑安装', risk:'23'},{name:'平台经济', risk:'31'}].map((t, i) => ({
+      ...t, click: () => this.setState({topic: i, tip: null}),
+      fg: S.topic === i ? '#1D5A99' : '#5A6B7B', weight: S.topic === i ? 600 : 400,
+      bar: S.topic === i ? '#1D5A99' : 'transparent'}));
+    // ══ 房地产 ══
+    const RE = [
+      {name:'拿地', amt:'3.2', taxes:['契税','耕地占用税','印花税'], riskN:4,
+       taxRows:[['契税',26400,25100],['耕地占用税',4800,4620],['印花税',920,905]],
+       risks:[{lv:'中', hex:'#D98A24', title:'土地成交价与契税计税依据不符', note:'成交公示价高于申报计税价 5% 以上', n:3},{lv:'低', hex:'#C9A227', title:'耕地占用税逾期申报', note:'取得用地批文超 30 日未申报', n:1}]},
+      {name:'开发建设', amt:'2.8', taxes:['增值税预缴','城建税','印花税'], riskN:7,
+       taxRows:[['增值税(预缴)',18600,16800],['城市维护建设税',2230,2020],['建安合同印花税',1480,1390]],
+       risks:[{lv:'高', hex:'#C0392B', title:'建安发票与工程进度背离', note:'形象进度 70%,取得建安发票仅 41%', n:4},{lv:'中', hex:'#D98A24', title:'甲供材未按规定计税', note:'甲供工程计税方式选择异常', n:3}]},
+      {name:'预售', amt:'6.4', taxes:['增值税预缴','土增税预征','企所税预计'], riskN:15,
+       taxRows:[['增值税(预缴 3%)',31200,28400],['土地增值税(预征)',18700,15300],['企业所得税(预计毛利)',14100,12600]],
+       risks:[{lv:'高', hex:'#C0392B', title:'预收款未足额预缴增值税', note:'按揭到账与申报预收款差异超 10%', n:7},{lv:'高', hex:'#C0392B', title:'土增税预征率适用错误', note:'普通住宅与非普通住宅混用预征率', n:5},{lv:'中', hex:'#D98A24', title:'诚意金/更名费未并入预收', note:'POS 流水存在账外收款特征', n:3}]},
+      {name:'现房销售', amt:'4.1', taxes:['增值税','土增税清算','企所税'], riskN:12,
+       taxRows:[['增值税',22800,21500],['土地增值税(清算)',16400,12100],['企业所得税',9800,9200]],
+       risks:[{lv:'高', hex:'#C0392B', title:'达到清算条件未申请清算', note:'销售比例超 85% 满 1 年,共 8 个项目', n:8},{lv:'中', hex:'#D98A24', title:'车位/储藏室收入未计税', note:'不动产登记与申报面积差异', n:4}]},
+      {name:'持有', amt:'1.9', taxes:['房产税','城镇土地使用税'], riskN:5,
+       taxRows:[['房产税(自持)',12400,11200],['城镇土地使用税',6600,6400]],
+       risks:[{lv:'中', hex:'#D98A24', title:'自持商业未申报房产税', note:'电力数据显示营业但零申报', n:5}]},
+      {name:'转让', amt:'3.0', taxes:['增值税','个税','契税','土增税'], riskN:3,
+       taxRows:[['增值税(二手交易)',13100,12800],['个人所得税',8200,7900],['契税(受让方)',8700,8600]],
+       risks:[{lv:'中', hex:'#D98A24', title:'阴阳合同低报成交价', note:'网签价明显低于同小区均价', n:3}]},
+    ];
+    const reNodes = RE.map((n, i) => {
+      const sel = S.reSel === i;
+      return {name: n.name, amt: n.amt, taxes: n.taxes, riskN: n.riskN, chev: sel ? '▾ 已展开' : '▸',
+        border: sel ? '1.5px solid #1D5A99' : '1px solid #D8DEE6', bg: sel ? '#F7FAFD' : '#fff',
+        hasArrow: i < RE.length - 1, click: () => this.setState({reSel: i})};
+    });
+    const reSel = RE[S.reSel];
+    const reSelTaxes = reSel.taxRows.map(t => {
+      const gap = t[2] - t[1];
+      return {name: t[0], due: fmt(t[1]), paid: fmt(t[2]),
+        gap: (gap >= 0 ? '+' : '') + fmt(gap), gapColor: gap >= 0 ? '#1E7F4F' : '#C0392B'};
+    });
+    const reProjHeads = [
+      {label:'项目名称', align:'left'},{label:'开发企业', align:'left'},{label:'当前环节', align:'left'},
+      {label:'累计网签(亿)', align:'right'},{label:'土增清算进度', align:'right'},{label:'累计纳税(万元)', align:'right'},{label:'清算风险', align:'center'}];
+    const reProjects = [
+      ['滨江壹号院','某房地产开发 *','现房销售','18.6',88,'32,400','高','#C0392B'],
+      ['云湖上城','某置业集团 *','预售','12.3',30,'18,700','高','#C0392B'],
+      ['学府雅苑','某城建投资 *','现房销售','9.8',62,'15,200','中','#D98A24'],
+      ['科创天地(商办)','某产业发展 *','持有','4.2',15,'6,800','中','#D98A24'],
+      ['锦绣家园三期','某房地产开发 *','预售','7.6',10,'9,300','低','#C9A227'],
+    ].map(p => ({name: p[0], dev: p[1], stage: p[2], sale: p[3], prog: p[4], pw: p[4] + '%', tax: p[5], risk: p[6], riskHex: p[7]}));
+    // ══ 建筑安装 ══
+    const CONP = [
+      ['市政快速路三标','某建工集团 *','城东区',4.8,72,1.1],['数据中心机电安装','某机电安装 *','高新区',2.6,81,0.8],
+      ['老旧小区改造二期','某建设发展 *','老城区',1.9,64,2.1],['产业园厂房总包','某建筑股份 *','经开区',5.4,58,2.2],
+      ['轨交附属工程','某隧道工程 *','城西区',6.2,45,2.4],['医院住院楼','某建工集团 *','城南区',3.1,52,2.3],
+      ['水环境治理EPC','某生态环境 *','临港新区',4.4,38,2.5],['学校迁建项目','某城建投资 *','江北区',2.2,49,2.0],
+      ['商业综合体幕墙','某幕墙装饰 *','城东区',1.6,86,0.6],['物流园道路工程','某路桥公司 *','经开区',1.2,68,1.7],
+      ['棚改安置房四标','某建筑劳务 *','城北区',2.8,77,0.9],['热力管网改造','某能源建设 *','湖滨区',1.4,61,1.9],
+      ['科研楼精装修','某装饰工程 *','高新区',1.1,90,0.5],['港区堆场扩建','某港务工程 *','临港新区',3.6,74,1.0]];
+    const cxv = inv => 52 + inv / 100 * 658, cyv = pre => 300 - pre / 3 * 290;
+    const conPts = CONP.map(p => {
+      const risky = p[4] > 55 && p[5] < 1.5;
+      return {x: Math.round(cxv(p[4])), y: Math.round(cyv(p[5])), r: Math.round(7 + Math.sqrt(p[3]) * 5),
+        hex: risky ? '#C0392B' : '#1D5A99',
+        enter: (e) => this.setTip(e, p[0], [
+          {k:'施工企业', v: p[1]}, {k:'合同金额', v: p[3] + ' 亿元'},
+          {k:'开票进度', v: p[4] + '%'}, {k:'预缴率', v: p[5] + '%'}])};
+    });
+    const conXT = [0, 25, 50, 75, 100].map(v => ({x: Math.round(cxv(v)), label: v + '%'}));
+    const conYT = [0, 1, 2, 3].map(v => ({y: Math.round(cyv(v)) + 4, label: v + '%'}));
+    const conStats = [
+      {label:'在建项目', value:'342', unit:'个', color:'#1C2733'},
+      {label:'跨区域施工项目', value:'87', unit:'个', color:'#1C2733'},
+      {label:'预缴到位率', value:'81.4', unit:'%', color:'#1D5A99'},
+      {label:'风险区项目', value:'23', unit:'个 · 预估欠缴 4,860 万', color:'#C0392B'}];
+    const conHeads = [
+      {label:'项目名称', align:'left'},{label:'施工企业', align:'left'},{label:'属地', align:'left'},
+      {label:'合同金额(亿)', align:'right'},{label:'开票进度', align:'right'},{label:'预缴率', align:'right'},{label:'预估欠缴(万元)', align:'right'}];
+    const conRisky = CONP.filter(p => p[4] > 55 && p[5] < 1.5).map(p => ({
+      name: p[0], corp: p[1], dist: p[2], amt: p[3].toFixed(1), inv: p[4], pre: p[5],
+      gap: fmt(Math.round(p[3] * 10000 * p[4]/100 * (2 - p[5]) / 100))}));
+    // ══ 平台经济 ══
+    const PLAT = [
+      {name:'某同城生活平台 *', type:'本地生活', merchants:14620, rate:61.2, riskN:2140,
+       bins:[[4820,3980],[3660,2610],[2940,1490],[1780,860],[980,620],[440,380]], gapN:1846, gapTax:2130},
+      {name:'某电商平台(区域仓)*', type:'电子商务', merchants:9840, rate:72.6, riskN:986,
+       bins:[[2610,2260],[2380,1890],[2140,1520],[1460,980],[820,610],[430,380]], gapN:912, gapTax:1480},
+      {name:'某货运撮合平台 *', type:'网络货运', merchants:6420, rate:54.8, riskN:1620,
+       bins:[[1240,860],[1480,820],[1520,760],[1180,540],[680,380],[320,210]], gapN:1284, gapTax:1960},
+      {name:'某灵活用工平台 *', type:'灵活用工', merchants:5540, rate:83.4, riskN:412,
+       bins:[[2210,2020],[1480,1310],[860,720],[540,420],[290,240],[160,140]], gapN:386, gapTax:520}];
+    const platCards = PLAT.map((p, i) => {
+      const sel = S.platSel === i;
+      const rateColor = p.rate >= 75 ? '#2E8757' : p.rate >= 60 ? '#C77A1B' : '#C0392B';
+      return {name: p.name, type: p.type, merchants: fmt(p.merchants), riskN: fmt(p.riskN),
+        rate: p.rate, rateW: p.rate + '%', rateColor,
+        border: sel ? '1.5px solid #1D5A99' : '1px solid #D8DEE6', bg: sel ? '#F7FAFD' : '#fff',
+        click: () => this.setState({platSel: i})};
+    });
+    const platSel = PLAT[S.platSel];
+    const BIN_LABELS = ['10万以下','10–50万','50–120万','120–300万','300–500万','500万以上'];
+    const binMax = Math.max(...platSel.bins.map(b => b[0]));
+    const platBins = platSel.bins.map((b, i) => ({
+      label: BIN_LABELS[i], h1: Math.round(b[0] / binMax * 190), h2: Math.round(b[1] / binMax * 190),
+      enter: (e) => this.setTip(e, BIN_LABELS[i] + ' · 商户申报', [
+        {k:'平台报送', v: fmt(b[0]) + ' 户'}, {k:'已申报', v: fmt(b[1]) + ' 户'},
+        {k:'申报缺口', v: fmt(b[0] - b[1]) + ' 户'}])}));
+    const platTop = [
+      ['某餐饮连锁(11 门店)*','本地生活 · 餐饮',486,'高','#C0392B'],['某建材经营部 *','电商 · 建材家居',412,'高','#C0392B'],
+      ['某个体运输车队 *','网络货运',368,'高','#C0392B'],['某服饰直播店 *','电商 · 服饰鞋包',291,'中','#D98A24'],
+      ['某生鲜配送站 *','本地生活 · 生鲜',246,'中','#D98A24'],['某家政服务号 *','灵活用工',188,'中','#D98A24'],
+    ].map((m, i) => ({rank: i+1, name: m[0], cat: m[1], sale: m[2], lv: m[3], hex: m[4]}));
+    return {
+      navGroups: this.navGroups('专题分析'),
+      timeVal: S.timeVal, distVal: S.distVal, timeOpen: S.timeOpen, distOpen: S.distOpen,
+      timeToggle: () => this.setState(s => ({timeOpen: !s.timeOpen, distOpen: false})),
+      distToggle: () => this.setState(s => ({distOpen: !s.distOpen, timeOpen: false})),
+      timeOptions: mkOpts(['本月','本季度','本年度','近 12 个月','自定义…'], S.timeVal, 'timeVal', 'timeOpen'),
+      distOptions: mkOpts(['全市','城东区','城西区','城南区','城北区','高新区','经开区','临港新区'], S.distVal, 'distVal', 'distOpen'),
+      topics, isRE: S.topic === 0, isCON: S.topic === 1, isPLT: S.topic === 2,
+      reNodes, reSelName: reSel.name, reSelTaxes, reSelRisks: reSel.risks, reSelRiskN: reSel.riskN + ' 项',
+      reProjHeads, reProjects,
+      conPts, conXT, conYT, conStats, conHeads, conRisky,
+      platCards, platSelName: platSel.name, platBins, platGapN: fmt(platSel.gapN), platGapTax: fmt(platSel.gapTax), platTop,
+      tipLeave: () => this.setState({tip: null}),
+      tipShow: !!S.tip, tipX: S.tip?.x ?? 0, tipY: S.tip?.y ?? 0,
+      tipTitle: S.tip?.title ?? '', tipRows: S.tip?.rows ?? []
+    };
+  }
+}
+</script>
+</body>
+</html>

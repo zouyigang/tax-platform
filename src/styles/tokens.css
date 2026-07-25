@@ -13,6 +13,8 @@
   /* ---------- 辅色 ---------- */
   --color-secondary-teal: #2E7E93;  /* 辅色 青蓝 · 次级图表 / 链接强调 */
   --color-secondary-steel: #5A7189; /* 辅色 钢灰蓝 · 次要信息 / 分组 */
+  --color-accent-blue: #3E7FB5;     /* 辅助蓝 · 决策图形(预测线/图例) */
+  --color-row-hover: #F4F8FC;       /* 表格行 悬浮 / 展开 / 下钻底 */
 
   /* ---------- 深色表面色 · 侧栏 / 深色区块 ---------- */
   --color-surface-dark: #16436F;        /* 侧栏 / 深色区块背景 */
@@ -110,6 +112,9 @@
   --shadow-md: 0 4px 16px rgba(28, 39, 51, 0.12);      /* 弹窗 */
   --shadow-drawer: -8px 0 24px rgba(28, 39, 51, 0.10); /* 右侧抽屉 */
   --overlay-mask: rgba(28, 39, 51, 0.5);               /* 弹窗遮罩 */
+  --color-tooltip-bg: rgba(22, 39, 55, 0.96);          /* 图表 tooltip 深底 */
+  --color-tooltip-key: #A9C0D4;                        /* tooltip 键名浅蓝 */
+  --shadow-tooltip: 0 6px 20px rgba(28, 39, 51, 0.3);  /* tooltip 浮层投影 */
 
   /* ---------- 布局 ---------- */
   --layout-sidebar-w: 210px;       /* 全局侧栏固定宽度（依据「平台侧栏」组件） */

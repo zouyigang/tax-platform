@@ -970,35 +970,79 @@ export const mockClient: ApiClient = {
     },
 
     getRevenueAnalysis(_query: DecisionQuery): Promise<RevenueAnalysis> {
-      const months = ['8月', '9月', '10月', '11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月', '7月']
-      const values = [6.2, 6.6, 7.0, 6.8, 7.3, 7.7, 8.0, 7.9, 8.4, 8.6, 8.9, 9.1]
+      // 各税种共用的区县下钻分布(与设计稿一致)
+      const distShare = [
+        { name: '城东区', share: 0.24, yoy: '+7.2%' },
+        { name: '高新区', share: 0.21, yoy: '+14.6%' },
+        { name: '城西区', share: 0.17, yoy: '+3.1%' },
+        { name: '经开区', share: 0.14, yoy: '+5.4%' },
+        { name: '其他区县', share: 0.24, yoy: '+1.8%' },
+      ]
+      const tax: Array<[string, number, number, string]> = [
+        ['增值税', 58.2, 31.6, '+9.0%'],
+        ['企业所得税', 32.4, 17.9, '+8.6%'],
+        ['个人所得税', 14.8, 8.6, '+10.7%'],
+        ['契税', 9.6, 4.7, '-10.0%'],
+        ['土地增值税', 8.4, 3.9, '-20.1%'],
+        ['房产税', 7.2, 4.1, '+5.2%'],
+        ['城镇土地使用税', 6.8, 3.8, '+2.4%'],
+        ['印花税', 5.4, 3.1, '+6.9%'],
+        ['其他税种', 9.8, 5.2, '+4.1%'],
+      ]
       return delay({
-        kpis: [
-          { label: '税收收入累计', value: '8.62', unit: '亿元', accent: 'primary' },
-          { label: '同比增幅', value: '6.4', unit: '%', accent: 'teal' },
-          { label: '预算完成率', value: '78.5', unit: '%', accent: 'green' },
-          { label: '入库进度', value: '82.3', unit: '%', accent: 'gold' },
+        progress: {
+          periodLabel: '本年度',
+          timeProgress: 56.2,
+          timeNote: '截至 7 月 24 日',
+          revenueProgress: 54.3,
+          revenueNote: '入库 82.9 亿 / 预算 152.6 亿',
+          laggingNote: '收入进度落后时间进度 1.9 个百分点',
+        },
+        headStats: [
+          { label: '累计入库', value: '82.9', unit: '亿元', note: '年度预算 152.6 亿', tone: 'default' },
+          { label: '同比增收', value: '+4.5', unit: '亿元', note: '增幅 +5.8%', tone: 'success' },
+          { label: '序时缺口', value: '-2.9', unit: '亿元', note: '较序时进度 -1.9pct', tone: 'danger' },
         ],
-        trend: months.map((label, i) => ({ label, value: values[i] })),
-        structure: {
-          totalLabel: '8.62亿',
-          segments: [
-            { name: '增值税', pct: 42 },
-            { name: '企业所得税', pct: 21 },
-            { name: '个人所得税', pct: 12 },
-            { name: '消费税', pct: 9 },
-            { name: '城建税及附加', pct: 7 },
-            { name: '其他税种', pct: 9 },
+        waterfall: [
+          { name: '去年同期', kind: 'base', value: 78.4, pct: '' },
+          { name: '增值税', kind: 'delta', value: 2.61, pct: '+9.0%' },
+          { name: '企业所得税', kind: 'delta', value: 1.42, pct: '+8.6%' },
+          { name: '个人所得税', kind: 'delta', value: 0.83, pct: '+10.7%' },
+          { name: '契税', kind: 'delta', value: -0.52, pct: '-10.0%' },
+          { name: '土地增值税', kind: 'delta', value: -0.98, pct: '-20.1%' },
+          { name: '其他税种', kind: 'delta', value: 1.14, pct: '+4.9%' },
+          { name: '今年同期', kind: 'base', value: 82.9, pct: '' },
+        ],
+        levelData: {
+          levelNames: ['中央级', '省级', '市级', '县区级'],
+          months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月'],
+          monthTotals: [10.8, 9.2, 12.4, 11.6, 12.9, 13.2, 12.8],
+          shares: [
+            [0.39, 0.12, 0.27, 0.22],
+            [0.37, 0.13, 0.28, 0.22],
+            [0.4, 0.11, 0.27, 0.22],
+            [0.38, 0.12, 0.28, 0.22],
+            [0.39, 0.12, 0.27, 0.22],
+            [0.38, 0.13, 0.27, 0.22],
+            [0.37, 0.12, 0.29, 0.22],
           ],
         },
-        districts: [
-          { name: '城东区', value: 21200 },
-          { name: '高新区', value: 18600 },
-          { name: '临江县', value: 14200 },
-          { name: '城西区', value: 12800 },
-          { name: '云岭县', value: 9800 },
-          { name: '江北新区', value: 7200 },
-        ],
+        forecast: {
+          months: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+          actual: [10.8, 9.2, 12.4, 11.6, 12.9, 13.2, 12.8],
+          predicted: [12.1, 12.6, 13.8, 12.9, 14.3],
+          bandWidth: [0.6, 0.85, 1.1, 1.3, 1.5],
+          yearForecast: '148.6 亿',
+          range: '145.2–152.1',
+          achieveProb: '37%',
+        },
+        taxRows: tax.map((t) => ({
+          name: t[0],
+          budget: t[1],
+          actual: t[2],
+          yoy: t[3],
+          districts: distShare,
+        })),
       })
     },
 

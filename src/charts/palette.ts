@@ -103,6 +103,35 @@ export const GRAPH_EDGE = {
   nodeIcon: '#FFFFFF',
 }
 
+/** 决策分析·图形专用配色(SVG/DOM 图元,后端不下发) */
+export const DECISION = {
+  /** 分级次(中央/省/市/县,自深至浅) */
+  levels: ['#16436F', '#3E7FB5', '#5FA8D3', '#B5D9FD'],
+  /** 瀑布:去年同期基准柱 */
+  wfBaseStart: '#5A6B7B',
+  /** 瀑布:今年同期基准柱 */
+  wfBaseEnd: '#1D5A99',
+  /** 瀑布:正贡献 / 负贡献 */
+  wfPos: '#2E8757',
+  wfNeg: '#C0392B',
+  /** 预测:实际线 / 预测线 / 置信带 */
+  actual: '#1D5A99',
+  pred: '#3E7FB5',
+  band: '#1D5A99',
+  /** 网格线 / 轴文字 / 当前竖线 */
+  grid: '#EAEEF3',
+  axis: '#97A3B0',
+  nowLine: '#C0392B',
+  /** 瀑布浮动连接虚线 */
+  connector: '#B6C0CA',
+  /** 主文本(基准柱数值) */
+  textMain: '#1C2733',
+  /** 柱下名称文字 */
+  nameText: '#5A6B7B',
+  /** 数据点圆心填充 */
+  symbolFill: '#FFFFFF',
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)
