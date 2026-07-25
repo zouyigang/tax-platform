@@ -18,8 +18,14 @@ import type {
   ClueRow,
   DashboardFilters,
   DashboardQuery,
+  DecisionFilters,
+  DecisionQuery,
   DistrictCompletion,
+  EffectivenessAnalysis,
   GraphData,
+  RevenueAnalysis,
+  TaxSourceAnalysis,
+  TopicAnalysis,
   KeyValue,
   KpiCard,
   PagedResult,
@@ -182,6 +188,24 @@ export const httpClient: ApiClient = {
   graph: {
     getGraph(rootId: string): Promise<GraphData> {
       return get<GraphData>('/graph', { rootId })
+    },
+  },
+
+  decision: {
+    getDecisionFilters(): Promise<DecisionFilters> {
+      return get<DecisionFilters>('/decision/filters')
+    },
+    getRevenueAnalysis(query: DecisionQuery): Promise<RevenueAnalysis> {
+      return get<RevenueAnalysis>('/decision/revenue', { period: query.period, districtCode: query.districtCode })
+    },
+    getTaxSourceAnalysis(query: DecisionQuery): Promise<TaxSourceAnalysis> {
+      return get<TaxSourceAnalysis>('/decision/tax-source', { period: query.period, districtCode: query.districtCode })
+    },
+    getEffectivenessAnalysis(query: DecisionQuery): Promise<EffectivenessAnalysis> {
+      return get<EffectivenessAnalysis>('/decision/effectiveness', { period: query.period, districtCode: query.districtCode })
+    },
+    getTopicAnalysis(query: DecisionQuery, topic: string): Promise<TopicAnalysis> {
+      return get<TopicAnalysis>('/decision/topic', { period: query.period, districtCode: query.districtCode, topic })
     },
   },
 }

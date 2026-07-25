@@ -864,6 +864,117 @@ export interface GraphApi {
 }
 
 /* ========================================================================
+ * 七、决策分析（Decision）· 收入 / 税源 / 治税成效 / 专题
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》8.1。四页共用「看板」范式(参照领导驾驶舱):
+ * 顶部周期/区县筛选 + KPI 行 + 若干图表面板。无设计稿,布局在设计系统内自绘。
+ * ====================================================================== */
+
+/** 折线 / 柱图单点(通用) */
+export interface SeriesPoint {
+  /** 分类标签(月份 / 行业 …) */
+  label: string
+  /** 数值 */
+  value: number
+}
+
+/** 命名数值(柱状 / 排名条通用) */
+export interface NamedValue {
+  /** 名称 */
+  name: string
+  /** 数值 */
+  value: number
+}
+
+/** 决策分析查询参数(周期 + 区县,作用于全页) */
+export interface DecisionQuery {
+  /** 统计周期 */
+  period: DashboardPeriod
+  /** 区县代码;'all' 表示全市 */
+  districtCode: string
+}
+
+/** 决策分析·共享筛选项 */
+export interface DecisionFilters {
+  /** 可选周期 */
+  periods: FilterOption[]
+  /** 默认周期 */
+  defaultPeriod: DashboardPeriod
+  /** 可选区县(含「全市」) */
+  districts: FilterOption[]
+  /** 默认区县代码 */
+  defaultDistrictCode: string
+  /** 专题分析·可选专题 */
+  topics: FilterOption[]
+  /** 默认专题 */
+  defaultTopic: string
+}
+
+/** KPI 卡(带顶部语义色条) */
+export type DecisionKpi = MetricItem & { accent: KpiAccent }
+
+/** 收入分析 */
+export interface RevenueAnalysis {
+  /** 顶部 KPI */
+  kpis: DecisionKpi[]
+  /** 收入趋势(近 12 月,亿元) */
+  trend: SeriesPoint[]
+  /** 分税种结构(环形) */
+  structure: TaxTypeStructure
+  /** 分区县收入(万元,已降序) */
+  districts: NamedValue[]
+}
+
+/** 税源分析 */
+export interface TaxSourceAnalysis {
+  kpis: DecisionKpi[]
+  /** 分行业税源户数 */
+  industries: NamedValue[]
+  /** 登记类型 / 规模结构(环形) */
+  structure: TaxTypeStructure
+  /** 分区县税源户数(已降序) */
+  districts: NamedValue[]
+}
+
+/** 治税成效分析 */
+export interface EffectivenessAnalysis {
+  kpis: DecisionKpi[]
+  /** 月度综合治税增收趋势(万元) */
+  trend: SeriesPoint[]
+  /** 分数据源增收贡献(万元) */
+  sources: NamedValue[]
+  /** 风险任务闭环各环节数量 */
+  funnel: NamedValue[]
+}
+
+/** 专题分析 */
+export interface TopicAnalysis {
+  /** 当前专题名称 */
+  topicName: string
+  kpis: DecisionKpi[]
+  /** 专题趋势 */
+  trend: SeriesPoint[]
+  /** 专题结构(环形) */
+  structure: TaxTypeStructure
+  /** 专题明细分解 */
+  breakdown: NamedValue[]
+}
+
+/** 决策分析接口分组 */
+export interface DecisionApi {
+  /** 共享筛选项(周期 / 区县 / 专题) */
+  getDecisionFilters(): Promise<DecisionFilters>
+  /** 收入分析 */
+  getRevenueAnalysis(query: DecisionQuery): Promise<RevenueAnalysis>
+  /** 税源分析 */
+  getTaxSourceAnalysis(query: DecisionQuery): Promise<TaxSourceAnalysis>
+  /** 治税成效分析 */
+  getEffectivenessAnalysis(query: DecisionQuery): Promise<EffectivenessAnalysis>
+  /** 专题分析(指定专题) */
+  getTopicAnalysis(query: DecisionQuery, topic: string): Promise<TopicAnalysis>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -879,4 +990,6 @@ export interface ApiClient {
   qa: QaApi
   /** 智能模型 · 关联图谱分析 */
   graph: GraphApi
+  /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
+  decision: DecisionApi
 }

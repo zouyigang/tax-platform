@@ -15,6 +15,10 @@ import ArchiveView from '@/views/ArchiveView.vue'
 import RuleConfigView from '@/views/RuleConfigView.vue'
 import QaView from '@/views/QaView.vue'
 import GraphView from '@/views/GraphView.vue'
+import RevenueAnalysisView from '@/views/decision/RevenueAnalysisView.vue'
+import TaxSourceAnalysisView from '@/views/decision/TaxSourceAnalysisView.vue'
+import EffectivenessAnalysisView from '@/views/decision/EffectivenessAnalysisView.vue'
+import TopicAnalysisView from '@/views/decision/TopicAnalysisView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import { MENU_LEAVES } from '@/config/menu'
 
@@ -27,6 +31,10 @@ const DONE_VIEWS: Record<string, Component> = {
   'rules-config': RuleConfigView,
   'app-qa': QaView,
   'model-graph': GraphView,
+  'decision-revenue': RevenueAnalysisView,
+  'decision-tax-source': TaxSourceAnalysisView,
+  'decision-effectiveness': EffectivenessAnalysisView,
+  'decision-topic': TopicAnalysisView,
 }
 
 // 由菜单叶子生成子路由:去掉前导斜杠作为相对路径,meta.nav 供高亮/占位页取用

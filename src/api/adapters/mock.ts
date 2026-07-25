@@ -21,9 +21,15 @@ import type {
   ComparisonModel,
   DashboardFilters,
   DashboardQuery,
+  DecisionFilters,
+  DecisionQuery,
   DistrictCompletion,
+  EffectivenessAnalysis,
   GraphData,
   GraphNodeDetail,
+  RevenueAnalysis,
+  TaxSourceAnalysis,
+  TopicAnalysis,
   KeyValue,
   KpiCard,
   PagedResult,
@@ -928,6 +934,175 @@ export const mockClient: ApiClient = {
           },
         ],
         suggestions: ['小微企业所得税优惠适用条件', '增值税加计抵减政策', '发票风险线索如何核查'],
+      })
+    },
+  },
+
+  /* ==================== 决策分析 ==================== */
+  decision: {
+    getDecisionFilters(): Promise<DecisionFilters> {
+      return delay({
+        periods: [
+          { value: 'month', label: '本月' },
+          { value: 'quarter', label: '本季' },
+          { value: 'year', label: '本年' },
+        ],
+        defaultPeriod: 'year',
+        districts: [
+          { value: 'all', label: '全市' },
+          { value: 'chengdong', label: '城东区' },
+          { value: 'gaoxin', label: '高新区' },
+          { value: 'linjiang', label: '临江县' },
+          { value: 'chengxi', label: '城西区' },
+          { value: 'yunling', label: '云岭县' },
+          { value: 'jiangbei', label: '江北新区' },
+        ],
+        defaultDistrictCode: 'all',
+        topics: [
+          { value: 'realestate', label: '房地产业专题' },
+          { value: 'construction', label: '建筑安装业专题' },
+          { value: 'retail', label: '批发零售业专题' },
+          { value: 'manufacture', label: '制造业专题' },
+          { value: 'service', label: '生活服务业专题' },
+        ],
+        defaultTopic: 'realestate',
+      })
+    },
+
+    getRevenueAnalysis(_query: DecisionQuery): Promise<RevenueAnalysis> {
+      const months = ['8月', '9月', '10月', '11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月', '7月']
+      const values = [6.2, 6.6, 7.0, 6.8, 7.3, 7.7, 8.0, 7.9, 8.4, 8.6, 8.9, 9.1]
+      return delay({
+        kpis: [
+          { label: '税收收入累计', value: '8.62', unit: '亿元', accent: 'primary' },
+          { label: '同比增幅', value: '6.4', unit: '%', accent: 'teal' },
+          { label: '预算完成率', value: '78.5', unit: '%', accent: 'green' },
+          { label: '入库进度', value: '82.3', unit: '%', accent: 'gold' },
+        ],
+        trend: months.map((label, i) => ({ label, value: values[i] })),
+        structure: {
+          totalLabel: '8.62亿',
+          segments: [
+            { name: '增值税', pct: 42 },
+            { name: '企业所得税', pct: 21 },
+            { name: '个人所得税', pct: 12 },
+            { name: '消费税', pct: 9 },
+            { name: '城建税及附加', pct: 7 },
+            { name: '其他税种', pct: 9 },
+          ],
+        },
+        districts: [
+          { name: '城东区', value: 21200 },
+          { name: '高新区', value: 18600 },
+          { name: '临江县', value: 14200 },
+          { name: '城西区', value: 12800 },
+          { name: '云岭县', value: 9800 },
+          { name: '江北新区', value: 7200 },
+        ],
+      })
+    },
+
+    getTaxSourceAnalysis(_query: DecisionQuery): Promise<TaxSourceAnalysis> {
+      return delay({
+        kpis: [
+          { label: '税源户数', value: '12.4', unit: '万户', accent: 'primary' },
+          { label: '本年新增', value: '8,620', unit: '户', accent: 'teal' },
+          { label: '本年注销', value: '3,240', unit: '户', accent: 'gold' },
+          { label: '正常经营占比', value: '91.2', unit: '%', accent: 'green' },
+        ],
+        industries: [
+          { name: '批发零售', value: 32000 },
+          { name: '制造业', value: 21000 },
+          { name: '建筑安装', value: 15000 },
+          { name: '生活服务', value: 12000 },
+          { name: '房地产', value: 6800 },
+          { name: '其他', value: 37200 },
+        ],
+        structure: {
+          totalLabel: '12.4万户',
+          segments: [
+            { name: '有限责任公司', pct: 58 },
+            { name: '个体工商户', pct: 26 },
+            { name: '合伙企业', pct: 8 },
+            { name: '股份有限公司', pct: 5 },
+            { name: '其他', pct: 3 },
+          ],
+        },
+        districts: [
+          { name: '城东区', value: 32000 },
+          { name: '高新区', value: 28000 },
+          { name: '城西区', value: 21000 },
+          { name: '临江县', value: 18000 },
+          { name: '云岭县', value: 14000 },
+          { name: '江北新区', value: 11000 },
+        ],
+      })
+    },
+
+    getEffectivenessAnalysis(_query: DecisionQuery): Promise<EffectivenessAnalysis> {
+      const months = ['8月', '9月', '10月', '11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月', '7月']
+      const values = [620, 740, 880, 760, 960, 1040, 1120, 1080, 1240, 1180, 1320, 1280]
+      return delay({
+        kpis: [
+          { label: '综合治税增收', value: '1.28', unit: '亿元', accent: 'gold' },
+          { label: '查补入库', value: '6,240', unit: '万元', accent: 'primary' },
+          { label: '线索命中率', value: '61.2', unit: '%', accent: 'teal' },
+          { label: '任务办结率', value: '86.3', unit: '%', accent: 'green' },
+        ],
+        trend: months.map((label, i) => ({ label, value: values[i] })),
+        sources: [
+          { name: '市场监管', value: 1280 },
+          { name: '社保', value: 960 },
+          { name: '不动产', value: 740 },
+          { name: '供电', value: 520 },
+          { name: '公共资源交易', value: 430 },
+          { name: '其他', value: 260 },
+        ],
+        funnel: [
+          { name: '推送', value: 4200 },
+          { name: '派发', value: 3600 },
+          { name: '处置', value: 3100 },
+          { name: '命中', value: 2400 },
+          { name: '入库', value: 1850 },
+        ],
+      })
+    },
+
+    getTopicAnalysis(_query: DecisionQuery, topic: string): Promise<TopicAnalysis> {
+      const TOPIC_NAME: Record<string, string> = {
+        realestate: '房地产业专题',
+        construction: '建筑安装业专题',
+        retail: '批发零售业专题',
+        manufacture: '制造业专题',
+        service: '生活服务业专题',
+      }
+      const months = ['2月', '3月', '4月', '5月', '6月', '7月']
+      const values = [1.42, 1.56, 1.38, 1.72, 1.84, 1.96]
+      return delay({
+        topicName: TOPIC_NAME[topic] || '专题分析',
+        kpis: [
+          { label: '专题税收', value: '1.96', unit: '亿元', accent: 'primary' },
+          { label: '同比增幅', value: '9.8', unit: '%', accent: 'teal' },
+          { label: '涉及税源', value: '1.2', unit: '万户', accent: 'green' },
+          { label: '风险企业', value: '186', unit: '户', accent: 'red' },
+        ],
+        trend: months.map((label, i) => ({ label, value: values[i] })),
+        structure: {
+          totalLabel: '1.96亿',
+          segments: [
+            { name: '增值税', pct: 38 },
+            { name: '企业所得税', pct: 24 },
+            { name: '土地增值税', pct: 18 },
+            { name: '契税', pct: 12 },
+            { name: '其他', pct: 8 },
+          ],
+        },
+        breakdown: [
+          { name: '开发环节', value: 8600 },
+          { name: '交易环节', value: 5400 },
+          { name: '持有环节', value: 3200 },
+          { name: '中介服务', value: 1800 },
+        ],
       })
     },
   },
