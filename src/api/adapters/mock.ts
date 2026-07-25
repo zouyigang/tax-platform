@@ -21,9 +21,16 @@ import type {
   ComparisonModel,
   DashboardFilters,
   DashboardQuery,
+  DataSourceMonitor,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
+  EntityMatchDetail,
+  EntityMatchFilters,
+  EntityMatchQuery,
+  EntityMatchRow,
+  MatchStatus,
+  QualityDashboard,
   EffectivenessAnalysis,
   GraphData,
   GraphNodeDetail,
@@ -107,6 +114,39 @@ const RULE_POOL: Omit<ClueRuleHit, 'no'>[] = [
 
 /** 千分位整数格式化 */
 const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 0 })
+
+/* ==================== 数据治理:主体识别演示数据 ==================== */
+interface RawEntity {
+  id: string
+  name: string
+  taxId: string
+  sourceCount: number
+  identifierCount: number
+  status: MatchStatus
+  confidence: number
+  updatedAt: string
+}
+
+const ENTITY_DATA: RawEntity[] = [
+  { id: 'EM2026-0412', name: '城东区某建材经营部', taxId: '91....MA2Q7X', sourceCount: 6, identifierCount: 9, status: 'matched', confidence: 98.6, updatedAt: '2026-07-24 06:10' },
+  { id: 'EM2026-0411', name: '高新区某智能装备公司', taxId: '91....MA8P4V', sourceCount: 5, identifierCount: 7, status: 'matched', confidence: 96.2, updatedAt: '2026-07-24 06:10' },
+  { id: 'EM2026-0409', name: '城西区某商贸有限公司', taxId: '91....MA2K3P', sourceCount: 4, identifierCount: 6, status: 'conflict', confidence: 72.4, updatedAt: '2026-07-24 06:08' },
+  { id: 'EM2026-0407', name: '江北新区某钢结构公司', taxId: '91....MA9L6W', sourceCount: 5, identifierCount: 8, status: 'pending', confidence: 81.5, updatedAt: '2026-07-24 06:08' },
+  { id: 'EM2026-0405', name: '临江县某科技有限公司', taxId: '91....MA2B9L', sourceCount: 3, identifierCount: 4, status: 'matched', confidence: 94.8, updatedAt: '2026-07-24 06:05' },
+  { id: 'EM2026-0403', name: '城东区某物流仓储公司', taxId: '91....MA3D8F', sourceCount: 4, identifierCount: 5, status: 'pending', confidence: 78.9, updatedAt: '2026-07-24 06:05' },
+  { id: 'EM2026-0401', name: '高新区某餐饮管理公司', taxId: '91....MA2M6D', sourceCount: 3, identifierCount: 5, status: 'conflict', confidence: 68.3, updatedAt: '2026-07-24 06:02' },
+  { id: 'EM2026-0398', name: '云岭县某矿业开发公司', taxId: '91....MA7Q2J', sourceCount: 6, identifierCount: 10, status: 'matched', confidence: 97.1, updatedAt: '2026-07-24 06:02' },
+  { id: 'EM2026-0396', name: '云岭县某运输有限公司', taxId: '91....MA4R5N', sourceCount: 2, identifierCount: 3, status: 'rejected', confidence: 42.6, updatedAt: '2026-07-24 05:58' },
+  { id: 'EM2026-0394', name: '城西区某装饰工程公司', taxId: '91....MA5W9G', sourceCount: 4, identifierCount: 6, status: 'matched', confidence: 93.4, updatedAt: '2026-07-24 05:58' },
+  { id: 'EM2026-0392', name: '江北新区某建筑劳务公司', taxId: '91....MA5T2K', sourceCount: 5, identifierCount: 7, status: 'pending', confidence: 84.2, updatedAt: '2026-07-24 05:55' },
+  { id: 'EM2026-0390', name: '高新区某软件服务公司', taxId: '91....MA1X7B', sourceCount: 3, identifierCount: 4, status: 'matched', confidence: 95.6, updatedAt: '2026-07-24 05:55' },
+  { id: 'EM2026-0388', name: '城东区某医药零售店', taxId: '91....MA3Y8H', sourceCount: 3, identifierCount: 4, status: 'conflict', confidence: 70.8, updatedAt: '2026-07-24 05:52' },
+  { id: 'EM2026-0386', name: '临江县某食品加工厂', taxId: '91....MA6H4S', sourceCount: 4, identifierCount: 6, status: 'matched', confidence: 92.3, updatedAt: '2026-07-24 05:52' },
+  { id: 'EM2026-0384', name: '临江县某农资经营部', taxId: '91....MA6Z3Q', sourceCount: 2, identifierCount: 3, status: 'rejected', confidence: 38.4, updatedAt: '2026-07-24 05:48' },
+  { id: 'EM2026-0382', name: '城西区某汽车销售公司', taxId: '91....MA8N5R', sourceCount: 5, identifierCount: 8, status: 'matched', confidence: 96.9, updatedAt: '2026-07-24 05:48' },
+  { id: 'EM2026-0380', name: '城西区某电子商务公司', taxId: '91....MA7E1C', sourceCount: 4, identifierCount: 6, status: 'pending', confidence: 79.6, updatedAt: '2026-07-24 05:45' },
+  { id: 'EM2026-0378', name: '江北新区某纺织有限公司', taxId: '91....MA2V6T', sourceCount: 3, identifierCount: 5, status: 'matched', confidence: 91.7, updatedAt: '2026-07-24 05:45' },
+]
 
 /* ==================== 规则库:演示数据集 ==================== */
 
@@ -759,6 +799,150 @@ export const mockClient: ApiClient = {
     getRuleDetail(id: string): Promise<RuleDetail> {
       const r = RULE_DATA.filter((x) => x.id === id)[0] || RULE_DATA[0]
       return delay(buildRuleDetail(r))
+    },
+  },
+
+  /* ==================== 数据治理 ==================== */
+  datagov: {
+    getDataSourceMonitor(): Promise<DataSourceMonitor> {
+      return delay({
+        kpis: [
+          { label: '接入数据源', value: '32', unit: '个', accent: 'primary' },
+          { label: '运行正常', value: '27', unit: '个', accent: 'green' },
+          { label: '异常数据源', value: '5', unit: '个', accent: 'red' },
+          { label: '今日接入量', value: '486.2', unit: '万条', accent: 'teal' },
+        ],
+        trend: [
+          { label: '7-18', value: 412.6 },
+          { label: '7-19', value: 438.2 },
+          { label: '7-20', value: 396.4 },
+          { label: '7-21', value: 452.8 },
+          { label: '7-22', value: 468.1 },
+          { label: '7-23', value: 471.5 },
+          { label: '7-24', value: 486.2 },
+        ],
+        rows: [
+          { id: 'DS-001', name: '增值税发票全量数据', dept: '税务内部', category: '发票类', status: 'normal', frequency: '实时', lastArrival: '2026-07-24 07:58', arrivalRate: 99.8, delayHours: 0, todayRecords: 1284600 },
+          { id: 'DS-002', name: '市场监管登记信息', dept: '市场监管局', category: '登记类', status: 'normal', frequency: '日', lastArrival: '2026-07-24 06:00', arrivalRate: 99.2, delayHours: 0, todayRecords: 18420 },
+          { id: 'DS-003', name: '社保参保缴费数据', dept: '人社局', category: '人员类', status: 'normal', frequency: '月', lastArrival: '2026-07-20 02:00', arrivalRate: 98.6, delayHours: 0, todayRecords: 0 },
+          { id: 'DS-004', name: '不动产登记过户', dept: '自然资源局', category: '资产类', status: 'delayed', frequency: '日', lastArrival: '2026-07-23 06:00', arrivalRate: 92.4, delayHours: 26, todayRecords: 0 },
+          { id: 'DS-005', name: '供电用电量数据', dept: '供电公司', category: '能耗类', status: 'normal', frequency: '月', lastArrival: '2026-07-15 03:00', arrivalRate: 97.8, delayHours: 0, todayRecords: 0 },
+          { id: 'DS-006', name: '银行大额资金流水', dept: '人民银行', category: '资金类', status: 'interrupted', frequency: '日', lastArrival: '2026-07-21 06:00', arrivalRate: 68.2, delayHours: 74, todayRecords: 0 },
+          { id: 'DS-007', name: '公共资源交易中标', dept: '公共资源交易中心', category: '交易类', status: 'normal', frequency: '日', lastArrival: '2026-07-24 06:00', arrivalRate: 96.4, delayHours: 0, todayRecords: 342 },
+          { id: 'DS-008', name: '住建施工许可', dept: '住建局', category: '资质类', status: 'delayed', frequency: '周', lastArrival: '2026-07-16 04:00', arrivalRate: 88.6, delayHours: 48, todayRecords: 0 },
+          { id: 'DS-009', name: '海关进出口报关', dept: '海关', category: '贸易类', status: 'normal', frequency: '日', lastArrival: '2026-07-24 05:30', arrivalRate: 98.1, delayHours: 0, todayRecords: 2860 },
+          { id: 'DS-010', name: '互联网平台经营数据', dept: '第三方平台', category: '平台类', status: 'offline', frequency: '月', lastArrival: '—', arrivalRate: 0, delayHours: 0, todayRecords: 0 },
+          { id: 'DS-011', name: '车辆登记与过户', dept: '公安交管', category: '资产类', status: 'normal', frequency: '日', lastArrival: '2026-07-24 06:00', arrivalRate: 97.2, delayHours: 0, todayRecords: 1240 },
+          { id: 'DS-012', name: '水务用水量数据', dept: '水务集团', category: '能耗类', status: 'delayed', frequency: '月', lastArrival: '2026-07-12 03:00', arrivalRate: 90.8, delayHours: 72, todayRecords: 0 },
+        ],
+        alerts: [
+          { title: '银行大额资金流水接入中断', desc: '已连续 3 个批次未到达,最近成功批次 2026-07-21;接口返回鉴权失败', level: 'high', time: '2026-07-24 06:05' },
+          { title: '不动产登记过户批次延迟', desc: '延迟 26 小时,超出约定时效(24 小时)', level: 'mid', time: '2026-07-24 06:02' },
+          { title: '互联网平台经营数据未接入', desc: '协议签署中,预计 8 月完成对接', level: 'low', time: '2026-07-22 09:00' },
+        ],
+      })
+    },
+
+    getQualityDashboard(): Promise<QualityDashboard> {
+      return delay({
+        overallScore: 86,
+        scoreNote: '综合质量良好;资金类与资产类数据的及时性拖累整体得分,建议督办对应部门',
+        dimensions: [
+          { name: '完整性', score: 92, weight: 25, issues: 148 },
+          { name: '准确性', score: 88, weight: 25, issues: 216 },
+          { name: '一致性', score: 84, weight: 20, issues: 312 },
+          { name: '及时性', score: 76, weight: 20, issues: 486 },
+          { name: '唯一性', score: 94, weight: 10, issues: 92 },
+        ],
+        trend: [
+          { label: '2月', value: 79 },
+          { label: '3月', value: 81 },
+          { label: '4月', value: 80 },
+          { label: '5月', value: 83 },
+          { label: '6月', value: 85 },
+          { label: '7月', value: 86 },
+        ],
+        sourceScores: [
+          { name: '发票全量数据', value: 96 },
+          { name: '市场监管登记', value: 93 },
+          { name: '社保参保数据', value: 90 },
+          { name: '海关报关数据', value: 88 },
+          { name: '供电用电量', value: 84 },
+          { name: '不动产登记', value: 78 },
+          { name: '银行资金流水', value: 71 },
+          { name: '住建施工许可', value: 68 },
+        ],
+        issues: [
+          { id: 'DQ-2026-1842', source: '不动产登记', table: 'ODS_REALESTATE_TRANS', rule: '过户日期不得晚于当前日期', level: 'high', count: 1246, foundAt: '2026-07-24 06:20' },
+          { id: 'DQ-2026-1841', source: '银行资金流水', table: 'ODS_BANK_FLOW', rule: '交易对手方名称非空', level: 'high', count: 986, foundAt: '2026-07-24 06:20' },
+          { id: 'DQ-2026-1839', source: '住建施工许可', table: 'ODS_CONSTRUCT_PERMIT', rule: '合同金额需与备案金额一致', level: 'mid', count: 642, foundAt: '2026-07-24 06:18' },
+          { id: 'DQ-2026-1837', source: '市场监管登记', table: 'ODS_MARKET_REG', rule: '统一社会信用代码校验位正确', level: 'mid', count: 318, foundAt: '2026-07-24 06:15' },
+          { id: 'DQ-2026-1835', source: '社保参保数据', table: 'ODS_SOCIAL_INSURE', rule: '参保人数不得为负', level: 'low', count: 86, foundAt: '2026-07-24 06:12' },
+          { id: 'DQ-2026-1833', source: '供电用电量', table: 'ODS_POWER_USAGE', rule: '同一户号同期不得重复', level: 'low', count: 54, foundAt: '2026-07-24 06:10' },
+        ],
+      })
+    },
+
+    getEntityMatchFilters(): Promise<EntityMatchFilters> {
+      const countBy = (s: MatchStatus) => ENTITY_DATA.filter((e) => e.status === s).length
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        statuses: [
+          { value: 'all', label: '全部状态', count: ENTITY_DATA.length },
+          { value: 'matched', label: '已匹配', count: countBy('matched') },
+          { value: 'pending', label: '待确认', count: countBy('pending') },
+          { value: 'conflict', label: '存在冲突', count: countBy('conflict') },
+          { value: 'rejected', label: '已排除', count: countBy('rejected') },
+        ],
+      })
+    },
+
+    getEntityMatches(query: EntityMatchQuery): Promise<PagedResult<EntityMatchRow>> {
+      const kw = query.keyword.trim()
+      const filtered = ENTITY_DATA.filter((e) => {
+        if (kw && e.name.indexOf(kw) < 0 && e.taxId.indexOf(kw) < 0 && e.id.indexOf(kw) < 0) return false
+        if (query.status !== 'all' && e.status !== query.status) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: filtered.slice(start, start + query.pageSize),
+        total: filtered.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getEntityMatchDetail(id: string): Promise<EntityMatchDetail> {
+      const e = ENTITY_DATA.filter((x) => x.id === id)[0] || ENTITY_DATA[0]
+      const hasConflict = e.status === 'conflict'
+      return delay({
+        id: e.id,
+        name: e.name,
+        taxId: e.taxId,
+        status: e.status,
+        confidence: e.confidence,
+        basis: [
+          '统一社会信用代码完全一致(权重 60%)',
+          '企业名称标准化后完全一致(权重 25%)',
+          '注册地址相似度 92%(权重 10%)',
+          '法定代表人姓名一致(权重 5%)',
+        ],
+        identifiers: [
+          { source: '税务登记', idType: '纳税人识别号', idValue: e.taxId, name: e.name, merged: true },
+          { source: '市场监管登记', idType: '统一社会信用代码', idValue: e.taxId, name: e.name, merged: true },
+          { source: '社保参保数据', idType: '社保登记号', idValue: '3301****8842', name: e.name, merged: true },
+          { source: '不动产登记', idType: '权利人证件号', idValue: e.taxId, name: `${e.name}(简称)`, merged: !hasConflict },
+          { source: '银行资金流水', idType: '开户许可证号', idValue: 'J33****0217', name: e.name, merged: !hasConflict },
+          { source: '公共资源交易', idType: '投标人编号', idValue: 'BID****3391', name: e.name, merged: true },
+        ].slice(0, e.identifierCount > 6 ? 6 : e.identifierCount),
+        conflicts: hasConflict
+          ? [
+              { field: '企业名称', masterValue: e.name, sourceValue: `${e.name}(曾用名)`, source: '不动产登记' },
+              { field: '注册地址', masterValue: '城西区解放路 XX 号', sourceValue: '城西区解放路 XX 号 3 幢', source: '银行资金流水' },
+            ]
+          : [],
+      })
     },
   },
 

@@ -19,6 +19,9 @@ import RevenueAnalysisView from '@/views/decision/RevenueAnalysisView.vue'
 import TaxSourceAnalysisView from '@/views/decision/TaxSourceAnalysisView.vue'
 import EffectivenessAnalysisView from '@/views/decision/EffectivenessAnalysisView.vue'
 import TopicAnalysisView from '@/views/decision/TopicAnalysisView.vue'
+import SourceMonitorView from '@/views/datagov/SourceMonitorView.vue'
+import QualityDashboardView from '@/views/datagov/QualityDashboardView.vue'
+import EntityMatchView from '@/views/datagov/EntityMatchView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import { MENU_LEAVES } from '@/config/menu'
 
@@ -35,6 +38,9 @@ const DONE_VIEWS: Record<string, Component> = {
   'decision-tax-source': TaxSourceAnalysisView,
   'decision-effectiveness': EffectivenessAnalysisView,
   'decision-topic': TopicAnalysisView,
+  'data-source-monitor': SourceMonitorView,
+  'data-quality': QualityDashboardView,
+  'data-entity-match': EntityMatchView,
 }
 
 // 由菜单叶子生成子路由:去掉前导斜杠作为相对路径,meta.nav 供高亮/占位页取用

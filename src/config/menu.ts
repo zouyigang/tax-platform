@@ -67,34 +67,19 @@ export const MENU: MenuEntry[] = [
         key: 'data-source-monitor',
         title: '数据源接入监控',
         path: '/data/source-monitor',
-        status: 'placeholder',
-        desc: [
-          '监控内部征管、外部委办、互联网等多源数据的接入状态与到达时效。',
-          '展示各数据源的连接健康度、批次到达率、延迟告警与断流预警。',
-          '对应需求 2.2 数据接入。',
-        ],
+        status: 'done',
       },
       {
         key: 'data-quality',
         title: '数据质量看板',
         path: '/data/quality',
-        status: 'placeholder',
-        desc: [
-          '从完整性、准确性、一致性、及时性等维度评估各类数据质量。',
-          '输出质量评分、问题数据清单与治理任务派发。',
-          '对应需求 2.5 数据质量管理。',
-        ],
+        status: 'done',
       },
       {
         key: 'data-entity-match',
         title: '主体识别与匹配',
         path: '/data/entity-match',
-        status: 'placeholder',
-        desc: [
-          '基于纳税人识别号、统一社会信用代码等标识,跨源识别并归并同一纳税主体。',
-          '处理一户多号、别名、关联自然人等匹配问题,沉淀主体唯一档案。',
-          '对应需求 2.3 主体识别与关联。',
-        ],
+        status: 'done',
       },
       {
         key: 'archive',

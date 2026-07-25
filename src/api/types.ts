@@ -1432,6 +1432,213 @@ export interface DecisionApi {
 }
 
 /* ========================================================================
+ * 八、数据治理（DataGov）· 数据源接入监控 / 数据质量看板 / 主体识别与匹配
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》2.2 数据接入、2.5 数据质量管理、2.3 主体识别与关联。
+ * 无设计稿,布局在既有设计系统内自绘(看板 + 列表范式)。
+ * ====================================================================== */
+
+/** 数据源接入状态:正常 / 延迟 / 中断 / 未接入 */
+export type SourceStatus = 'normal' | 'delayed' | 'interrupted' | 'offline'
+
+/** 数据源接入监控·单个数据源 */
+export interface DataSourceRow {
+  /** 数据源编码 */
+  id: string
+  /** 数据源名称 */
+  name: string
+  /** 提供部门 */
+  dept: string
+  /** 数据类别(如「登记类」「资金类」) */
+  category: string
+  /** 接入状态 */
+  status: SourceStatus
+  /** 接入频率(实时 / 日 / 周 / 月) */
+  frequency: string
+  /** 最近到达时间 */
+  lastArrival: string
+  /** 批次到达率(百分数) */
+  arrivalRate: number
+  /** 当前延迟(小时);0 表示无延迟 */
+  delayHours: number
+  /** 今日接入记录数 */
+  todayRecords: number
+}
+
+/** 接入告警 */
+export interface SourceAlert {
+  /** 告警标题 */
+  title: string
+  /** 告警说明 */
+  desc: string
+  /** 告警级别 */
+  level: RiskLevel
+  /** 发生时间 */
+  time: string
+}
+
+/** 数据源接入监控 */
+export interface DataSourceMonitor {
+  /** 顶部指标(接入总数/正常/异常/今日接入量) */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+  /** 近 7 日接入量趋势(万条) */
+  trend: SeriesPoint[]
+  /** 数据源清单 */
+  rows: DataSourceRow[]
+  /** 接入告警 */
+  alerts: SourceAlert[]
+}
+
+/** 数据质量·单个评估维度 */
+export interface QualityDimension {
+  /** 维度名(完整性/准确性/一致性/及时性/唯一性) */
+  name: string
+  /** 得分(0–100) */
+  score: number
+  /** 权重(百分数) */
+  weight: number
+  /** 问题条目数 */
+  issues: number
+}
+
+/** 数据质量·问题清单行 */
+export interface QualityIssueRow {
+  /** 问题编号 */
+  id: string
+  /** 来源数据源 */
+  source: string
+  /** 涉及数据表 */
+  table: string
+  /** 命中的质量规则 */
+  rule: string
+  /** 严重程度 */
+  level: RiskLevel
+  /** 问题记录数 */
+  count: number
+  /** 发现时间 */
+  foundAt: string
+}
+
+/** 数据质量看板 */
+export interface QualityDashboard {
+  /** 综合质量得分(0–100) */
+  overallScore: number
+  /** 得分结论文案 */
+  scoreNote: string
+  /** 各维度得分 */
+  dimensions: QualityDimension[]
+  /** 近 6 期质量得分趋势 */
+  trend: SeriesPoint[]
+  /** 各数据源质量得分(降序) */
+  sourceScores: NamedValue[]
+  /** 问题数据清单 */
+  issues: QualityIssueRow[]
+}
+
+/** 主体匹配状态:已匹配 / 待确认 / 存在冲突 / 已排除 */
+export type MatchStatus = 'matched' | 'pending' | 'conflict' | 'rejected'
+
+/** 主体识别·列表查询参数 */
+export interface EntityMatchQuery {
+  /** 名称 / 识别号关键字 */
+  keyword: string
+  /** 匹配状态;'all' 表示不限 */
+  status: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 主体识别·列表行 */
+export interface EntityMatchRow {
+  /** 主体归并 id */
+  id: string
+  /** 主体名称 */
+  name: string
+  /** 纳税人识别号(脱敏) */
+  taxId: string
+  /** 涉及数据源数量 */
+  sourceCount: number
+  /** 关联标识数量 */
+  identifierCount: number
+  /** 匹配状态 */
+  status: MatchStatus
+  /** 匹配置信度(百分数) */
+  confidence: number
+  /** 最近更新时间 */
+  updatedAt: string
+}
+
+/** 主体识别·单条来源标识 */
+export interface EntityIdentifier {
+  /** 来源数据源 */
+  source: string
+  /** 标识类型(统一社会信用代码 / 工商注册号 / 组织机构代码…) */
+  idType: string
+  /** 标识值(脱敏) */
+  idValue: string
+  /** 该源登记的主体名称 */
+  name: string
+  /** 是否已归并到主档 */
+  merged: boolean
+}
+
+/** 主体识别·冲突项 */
+export interface EntityConflict {
+  /** 冲突字段 */
+  field: string
+  /** 主档值 */
+  masterValue: string
+  /** 来源值 */
+  sourceValue: string
+  /** 来源数据源 */
+  source: string
+}
+
+/** 主体识别·详情 */
+export interface EntityMatchDetail {
+  /** 主体归并 id */
+  id: string
+  /** 主体名称 */
+  name: string
+  /** 纳税人识别号(脱敏) */
+  taxId: string
+  /** 匹配状态 */
+  status: MatchStatus
+  /** 匹配置信度(百分数) */
+  confidence: number
+  /** 匹配依据说明 */
+  basis: string[]
+  /** 各来源标识 */
+  identifiers: EntityIdentifier[]
+  /** 字段冲突 */
+  conflicts: EntityConflict[]
+}
+
+/** 主体识别·筛选项 */
+export interface EntityMatchFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 状态选项(含「全部状态」,附计数) */
+  statuses: Array<FilterOption & { count: number }>
+}
+
+/** 数据治理接口分组 */
+export interface DataGovApi {
+  /** 数据源接入监控 */
+  getDataSourceMonitor(): Promise<DataSourceMonitor>
+  /** 数据质量看板 */
+  getQualityDashboard(): Promise<QualityDashboard>
+  /** 主体识别·筛选项 */
+  getEntityMatchFilters(): Promise<EntityMatchFilters>
+  /** 主体识别·列表(分页) */
+  getEntityMatches(query: EntityMatchQuery): Promise<PagedResult<EntityMatchRow>>
+  /** 主体识别·详情 */
+  getEntityMatchDetail(id: string): Promise<EntityMatchDetail>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -1449,4 +1656,6 @@ export interface ApiClient {
   graph: GraphApi
   /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
   decision: DecisionApi
+  /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */
+  datagov: DataGovApi
 }

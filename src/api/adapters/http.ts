@@ -18,9 +18,15 @@ import type {
   ClueRow,
   DashboardFilters,
   DashboardQuery,
+  DataSourceMonitor,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
+  EntityMatchDetail,
+  EntityMatchFilters,
+  EntityMatchQuery,
+  EntityMatchRow,
+  QualityDashboard,
   EffectivenessAnalysis,
   GraphData,
   RevenueAnalysis,
@@ -206,6 +212,29 @@ export const httpClient: ApiClient = {
     },
     getTopicAnalysis(query: DecisionQuery): Promise<TopicAnalysis> {
       return get<TopicAnalysis>('/decision/topic', { period: query.period, districtCode: query.districtCode })
+    },
+  },
+
+  datagov: {
+    getDataSourceMonitor(): Promise<DataSourceMonitor> {
+      return get<DataSourceMonitor>('/datagov/source-monitor')
+    },
+    getQualityDashboard(): Promise<QualityDashboard> {
+      return get<QualityDashboard>('/datagov/quality')
+    },
+    getEntityMatchFilters(): Promise<EntityMatchFilters> {
+      return get<EntityMatchFilters>('/datagov/entity-match/filters')
+    },
+    getEntityMatches(query: EntityMatchQuery): Promise<PagedResult<EntityMatchRow>> {
+      return get<PagedResult<EntityMatchRow>>('/datagov/entity-match', {
+        keyword: query.keyword,
+        status: query.status,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getEntityMatchDetail(id: string): Promise<EntityMatchDetail> {
+      return get<EntityMatchDetail>(`/datagov/entity-match/${encodeURIComponent(id)}`)
     },
   },
 }
