@@ -1122,30 +1122,120 @@ export const mockClient: ApiClient = {
     },
 
     getEffectivenessAnalysis(_query: DecisionQuery): Promise<EffectivenessAnalysis> {
-      const months = ['8月', '9月', '10月', '11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月', '7月']
-      const values = [620, 740, 880, 760, 960, 1040, 1120, 1080, 1240, 1180, 1320, 1280]
+      const kv = (k: string, v: string) => ({ key: k, value: v, numeric: true })
       return delay({
-        kpis: [
-          { label: '综合治税增收', value: '1.28', unit: '亿元', accent: 'gold' },
-          { label: '查补入库', value: '6,240', unit: '万元', accent: 'primary' },
-          { label: '线索命中率', value: '61.2', unit: '%', accent: 'teal' },
-          { label: '任务办结率', value: '86.3', unit: '%', accent: 'green' },
+        headline: '整体入库转化 8.7%,累计增收 3.42 亿元',
+        stages: [
+          {
+            name: '规则命中', count: 48672, unit: '条', sub: '214 条规则 · 9 个模型', days: '实时',
+            tips: [kv('本月新增', '6,214 条'), kv('去重合并后', '12,094 条'), kv('命中规则数', '187 / 214 条')],
+            connector: { rate: '转化 19.1%', loss: '39,354', note: '排除 / 合并' },
+          },
+          {
+            name: '有效线索', count: 9318, unit: '条', sub: '经初筛与人工确认', days: '1.2 天',
+            tips: [kv('高风险', '2,431 条'), kv('中风险', '4,562 条'), kv('低风险', '2,325 条')],
+            connector: { rate: '转化 70.2%', loss: '2,776', note: '待核查 / 超期' },
+          },
+          {
+            name: '已核查', count: 6542, unit: '户', sub: '实地 + 案头核查', days: '8.6 天',
+            tips: [kv('实地核查', '2,187 户'), kv('案头核查', '4,355 户'), kv('在办未结', '1,204 户')],
+            connector: { rate: '查实 74.5%', loss: '1,669', note: '核查无问题' },
+          },
+          {
+            name: '已定性', count: 4873, unit: '户', sub: '查实存在涉税问题', days: '3.4 天',
+            tips: [kv('补缴申报', '3,912 户'), kv('行政处罚', '645 户'), kv('移送稽查', '316 户')],
+            connector: { rate: '入库 86.5%', loss: '658', note: '争议 / 分期在途' },
+          },
+          {
+            name: '税款入库', count: 4215, unit: '户', sub: '累计入库 3.42 亿元', days: '5.1 天',
+            tips: [kv('查补税款', '2.86 亿元'), kv('滞纳金罚款', '0.56 亿元'), kv('户均入库', '8.11 万元')],
+            connector: null,
+          },
         ],
-        trend: months.map((label, i) => ({ label, value: values[i] })),
+        drills: [
+          {
+            note: '口径:本年度累计命中(去重前)',
+            columns: [
+              { title: '按数据源', rows: [{ name: '发票数据', value: 18420 }, { name: '电力能耗', value: 9860 }, { name: '不动产登记', value: 7420 }, { name: '银行大额流水', value: 5210 }] },
+              { title: '按区县', rows: [{ name: '城东区', value: 9840 }, { name: '高新区', value: 8620 }, { name: '城西区', value: 7410 }, { name: '经开区', value: 6280 }] },
+              { title: '按命中规则 TOP4', rows: [{ name: '进销项背离', value: 6240 }, { name: '电力税收弹性异常', value: 4180 }, { name: '房土两税漏征', value: 3560 }, { name: '虚开发票特征', value: 2870 }] },
+            ],
+          },
+          {
+            note: '口径:初筛 + 人工确认后的有效线索',
+            columns: [
+              { title: '按数据源', rows: [{ name: '发票数据', value: 3120 }, { name: '电力能耗', value: 2140 }, { name: '不动产登记', value: 1680 }, { name: '银行大额流水', value: 1240 }] },
+              { title: '按区县', rows: [{ name: '城东区', value: 1860 }, { name: '高新区', value: 1720 }, { name: '城西区', value: 1450 }, { name: '经开区', value: 1180 }] },
+              { title: '按风险等级', rows: [{ name: '高风险', value: 2431 }, { name: '中风险', value: 4562 }, { name: '低风险', value: 2325 }, { name: '待复核', value: 0 }] },
+            ],
+          },
+          {
+            note: '口径:已完成核查程序的户数',
+            columns: [
+              { title: '按核查方式', rows: [{ name: '案头核查', value: 4355 }, { name: '实地核查', value: 2187 }, { name: '约谈自查', value: 1420 }, { name: '联合检查', value: 380 }] },
+              { title: '按区县', rows: [{ name: '城东区', value: 1320 }, { name: '高新区', value: 1180 }, { name: '城西区', value: 1040 }, { name: '经开区', value: 860 }] },
+              { title: '按行业', rows: [{ name: '批发零售', value: 1980 }, { name: '建筑房地产', value: 1560 }, { name: '制造业', value: 1240 }, { name: '现代服务', value: 920 }] },
+            ],
+          },
+          {
+            note: '口径:查实存在涉税问题并已定性',
+            columns: [
+              { title: '按定性类型', rows: [{ name: '补缴申报', value: 3912 }, { name: '行政处罚', value: 645 }, { name: '移送稽查', value: 316 }, { name: '其他', value: 0 }] },
+              { title: '按区县', rows: [{ name: '城东区', value: 1020 }, { name: '高新区', value: 890 }, { name: '城西区', value: 760 }, { name: '经开区', value: 640 }] },
+              { title: '按行业', rows: [{ name: '批发零售', value: 1510 }, { name: '建筑房地产', value: 1230 }, { name: '制造业', value: 940 }, { name: '现代服务', value: 680 }] },
+            ],
+          },
+          {
+            note: '口径:税款(含滞纳金罚款)实际入库',
+            columns: [
+              { title: '按税种(万元)', rows: [{ name: '增值税', value: 13860 }, { name: '企业所得税', value: 9420 }, { name: '个人所得税', value: 4210 }, { name: '土地增值税', value: 3350 }] },
+              { title: '按区县(万元)', rows: [{ name: '城东区', value: 7840 }, { name: '高新区', value: 6920 }, { name: '城西区', value: 5480 }, { name: '经开区', value: 4360 }] },
+              { title: '按入库方式', rows: [{ name: '自行补缴', value: 2870 }, { name: '责令追缴', value: 984 }, { name: '强制执行', value: 245 }, { name: '分期入库', value: 116 }] },
+            ],
+          },
+        ],
         sources: [
-          { name: '市场监管', value: 1280 },
-          { name: '社保', value: 960 },
-          { name: '不动产', value: 740 },
-          { name: '供电', value: 520 },
-          { name: '公共资源交易', value: 430 },
-          { name: '其他', value: 260 },
+          { name: '发票全量数据', value: 6420, clues: 3120, rate: 76.4 },
+          { name: '电力能耗数据', value: 4860, clues: 2140, rate: 71.2 },
+          { name: '不动产登记', value: 3150, clues: 1680, rate: 68.9 },
+          { name: '银行大额流水', value: 2740, clues: 1240, rate: 74.8 },
+          { name: '社保参保数据', value: 1980, clues: 860, rate: 61.5 },
+          { name: '互联网平台经营', value: 1560, clues: 720, rate: 58.3 },
         ],
-        funnel: [
-          { name: '推送', value: 4200 },
-          { name: '派发', value: 3600 },
-          { name: '处置', value: 3100 },
-          { name: '命中', value: 2400 },
-          { name: '入库', value: 1850 },
+        sourceNote: '共接入 9 类部门数据 · 覆盖 23 个成员单位',
+        sourceTotal: '合计 20,710 万元',
+        ruleLegend: '规则引擎(214 条在用)',
+        modelLegend: '智能模型(9 个在用)',
+        compareTabs: [
+          {
+            name: '查实率对比', unit: '%', summary: '模型平均查实率高 9.4 个百分点',
+            categories: ['增值税', '企业所得税', '个人所得税', '土地增值税', '房产税'],
+            rule: [68, 62, 55, 71, 64], model: [79, 74, 70, 66, 72],
+          },
+          {
+            name: '入库贡献', unit: '万元', summary: '规则引擎贡献占比 58.2%',
+            categories: ['增值税', '企业所得税', '个人所得税', '土地增值税', '房产税'],
+            rule: [5210, 3860, 1240, 980, 760], model: [3120, 2540, 1890, 640, 540],
+          },
+          {
+            name: '耗时对比', unit: '天', summary: '模型线索平均结案快 3.3 天',
+            categories: ['增值税', '企业所得税', '个人所得税', '土地增值税', '房产税'],
+            rule: [9.8, 11.2, 8.4, 12.6, 10.1], model: [6.2, 7.4, 5.8, 9.1, 7.0],
+          },
+        ],
+        bureaus: [
+          { name: '城东分局', clues: 1860, checked: 1320, rate: 78.2, tax: 7840, days: 10.4, mom: '+12.6%' },
+          { name: '高新区分局', clues: 1720, checked: 1180, rate: 81.5, tax: 6920, days: 9.2, mom: '+18.3%' },
+          { name: '城西分局', clues: 1450, checked: 1040, rate: 72.8, tax: 5480, days: 11.6, mom: '+6.4%' },
+          { name: '经开区分局', clues: 1180, checked: 860, rate: 74.1, tax: 4360, days: 10.8, mom: '+9.1%' },
+          { name: '城南分局', clues: 940, checked: 690, rate: 69.4, tax: 3210, days: 12.3, mom: '-2.8%' },
+          { name: '城北分局', clues: 860, checked: 610, rate: 66.2, tax: 2870, days: 13.1, mom: '+4.2%' },
+          { name: '临港分局', clues: 620, checked: 450, rate: 71.8, tax: 2340, days: 11.9, mom: '+15.7%' },
+          { name: '江北分局', clues: 540, checked: 390, rate: 63.5, tax: 1860, days: 14.2, mom: '-5.1%' },
+          { name: '湖滨分局', clues: 480, checked: 340, rate: 67.9, tax: 1640, days: 12.8, mom: '+3.6%' },
+          { name: '老城分局', clues: 420, checked: 300, rate: 61.2, tax: 1380, days: 15.4, mom: '-1.9%' },
+          { name: '铁西分局', clues: 380, checked: 270, rate: 64.8, tax: 1210, days: 13.7, mom: '+7.8%' },
+          { name: '直属一分局', clues: 310, checked: 220, rate: 70.3, tax: 980, days: 10.9, mom: '+11.2%' },
         ],
       })
     },

@@ -115,6 +115,7 @@
   --color-tooltip-bg: rgba(22, 39, 55, 0.96);          /* 图表 tooltip 深底 */
   --color-tooltip-key: #A9C0D4;                        /* tooltip 键名浅蓝 */
   --shadow-tooltip: 0 6px 20px rgba(28, 39, 51, 0.3);  /* tooltip 浮层投影 */
+  --shadow-selected: 0 3px 10px rgba(29, 90, 153, 0.14); /* 选中卡片(主色调)投影 */
 
   /* ---------- 布局 ---------- */
   --layout-sidebar-w: 210px;       /* 全局侧栏固定宽度（依据「平台侧栏」组件） */

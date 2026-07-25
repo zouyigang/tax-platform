@@ -1130,15 +1130,118 @@ export interface TaxSourceAnalysis {
   bubbles: DistrictBubble[]
 }
 
+/** 闭环环节间的连接器(转化率 + 流失) */
+export interface StageConnector {
+  /** 转化率文案(如「转化 19.1%」) */
+  rate: string
+  /** 流失量文案 */
+  loss: string
+  /** 流失去向说明 */
+  note: string
+}
+
+/** 治税闭环·单个环节 */
+export interface EffectStage {
+  /** 环节名 */
+  name: string
+  /** 数量 */
+  count: number
+  /** 单位(条/户) */
+  unit: string
+  /** 环节说明 */
+  sub: string
+  /** 平均耗时文案 */
+  days: string
+  /** 悬停明细 */
+  tips: KeyValue[]
+  /** 指向下一环节的连接器;末环节为 null */
+  connector: StageConnector | null
+}
+
+/** 下钻明细·一列(一个维度) */
+export interface DrillColumn {
+  /** 维度标题 */
+  title: string
+  /** 该维度下的条目 */
+  rows: NamedValue[]
+}
+
+/** 下钻明细·对应某个环节 */
+export interface StageDrill {
+  /** 口径说明 */
+  note: string
+  /** 3 列维度分解 */
+  columns: DrillColumn[]
+}
+
+/** 分数据源增收贡献·单项 */
+export interface SourceContributionRow {
+  /** 数据源名 */
+  name: string
+  /** 入库税款(万元) */
+  value: number
+  /** 有效线索(条) */
+  clues: number
+  /** 查实率(百分数) */
+  rate: number
+}
+
+/** 规则引擎 vs 智能模型·单个对比维度(tab) */
+export interface CompareTab {
+  /** 维度名(查实率对比/入库贡献/耗时对比) */
+  name: string
+  /** 数值单位 */
+  unit: string
+  /** 结论摘要 */
+  summary: string
+  /** 分类标签(税种) */
+  categories: string[]
+  /** 规则引擎各分类数值 */
+  rule: number[]
+  /** 智能模型各分类数值 */
+  model: number[]
+}
+
+/** 分局治税成效排行·单行 */
+export interface BureauRow {
+  /** 分局名 */
+  name: string
+  /** 有效线索(条) */
+  clues: number
+  /** 已核查(户) */
+  checked: number
+  /** 查实率(百分数) */
+  rate: number
+  /** 入库税款(万元) */
+  tax: number
+  /** 户均耗时(天) */
+  days: number
+  /** 环比文案(带符号) */
+  mom: string
+}
+
 /** 治税成效分析 */
 export interface EffectivenessAnalysis {
-  kpis: DecisionKpi[]
-  /** 月度综合治税增收趋势(万元) */
-  trend: SeriesPoint[]
-  /** 分数据源增收贡献(万元) */
-  sources: NamedValue[]
-  /** 风险任务闭环各环节数量 */
-  funnel: NamedValue[]
+  /** 闭环整体结论文案 */
+  headline: string
+  /** 闭环 5 个环节 */
+  stages: EffectStage[]
+  /** 各环节的下钻明细(与 stages 等长、同序) */
+  drills: StageDrill[]
+  /** 分数据源增收贡献 */
+  sources: SourceContributionRow[]
+  /** 数据源接入说明 */
+  sourceNote: string
+  /** 数据源合计文案 */
+  sourceTotal: string
+  /** 规则引擎在用条数说明 */
+  ruleLegend: string
+  /** 智能模型在用个数说明 */
+  modelLegend: string
+  /** 规则 vs 模型 三个对比维度 */
+  compareTabs: CompareTab[]
+  /** 分局排行 */
+  bureaus: BureauRow[]
 }
 
 /** 专题分析 */
