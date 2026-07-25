@@ -130,6 +130,24 @@ export const DECISION = {
   nameText: '#5A6B7B',
   /** 数据点圆心填充 */
   symbolFill: '#FFFFFF',
+  /** 深蓝(气泡名 / 深色柱) */
+  deepBlue: '#16436F',
+  /** 浅蓝(帕累托线 / 迁入 / 市级) */
+  lightBlue: '#5FA8D3',
+  /** 迁出(橙) */
+  moveOut: '#D98A24',
+  /** 80% 参考线(橙) */
+  line80: '#C77A1B',
+  /** 象限均值虚线 */
+  meanLine: '#C4CDD6',
+  /** 行业结构 5 阶(自下而上) */
+  industry: ['#16436F', '#1D5A99', '#3E7FB5', '#5FA8D3', '#B5D9FD'],
+  /** 轴下分类文字(月份 / 序号) */
+  axisText: '#6E7C8B',
+  /** 坐标轴线 */
+  axisLine: '#D8DEE6',
+  /** 正向数值文字(净增) */
+  posText: '#1E7F4F',
 }
 
 // KPI 顶部色条与变化文案的取色已迁移:

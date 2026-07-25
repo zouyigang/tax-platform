@@ -1028,15 +1028,106 @@ export interface RevenueAnalysis {
   taxRows: RevenueTaxRow[]
 }
 
+/** 税源分析·顶部指标横条单项 */
+export interface TaxSourceStat {
+  /** 名称 */
+  label: string
+  /** 数值(已格式化) */
+  value: string
+  /** 补充说明 */
+  note: string
+  /** 取色语气 */
+  tone: Tone
+}
+
+/** 帕累托·单个纳税户 */
+export interface ParetoEntity {
+  /** 脱敏名称 */
+  name: string
+  /** 本年入库(万元) */
+  value: number
+}
+
+/** 集中度指标条 */
+export interface ConcentrationBar {
+  /** 名称(CR5/CR10/CR50) */
+  name: string
+  /** 占比(百分数) */
+  pct: number
+  /** 同比变动文案 */
+  delta: string
+}
+
+/** 纳税规模梯队 */
+export interface ScaleTier {
+  /** 规模区间名 */
+  name: string
+  /** 户数 */
+  count: number
+}
+
+/** 税源流动·单月 */
+export interface FlowMonth {
+  /** 月份 */
+  month: string
+  /** 新办(户) */
+  add: number
+  /** 迁入(户) */
+  moveIn: number
+  /** 注销(户) */
+  cancel: number
+  /** 迁出(户) */
+  moveOut: number
+}
+
+/** 行业结构演变·单行业(8 季度占比) */
+export interface IndustrySeries {
+  /** 行业名 */
+  name: string
+  /** 各季度税收占比(百分数,len=8) */
+  values: number[]
+}
+
+/** 区域气泡·单区县 */
+export interface DistrictBubble {
+  /** 区县名 */
+  name: string
+  /** 税源户数 */
+  households: number
+  /** 户均税额(万元) */
+  avgTax: number
+  /** 税收总量(亿元) */
+  totalTax: number
+}
+
 /** 税源分析 */
 export interface TaxSourceAnalysis {
-  kpis: DecisionKpi[]
-  /** 分行业税源户数 */
-  industries: NamedValue[]
-  /** 登记类型 / 规模结构(环形) */
-  structure: TaxTypeStructure
-  /** 分区县税源户数(已降序) */
-  districts: NamedValue[]
+  /** 顶部指标横条 */
+  headStats: TaxSourceStat[]
+  /** 帕累托·全市税收基数(万元,用于累计占比) */
+  paretoTotal: number
+  /** 帕累托·TOP 纳税户(已降序) */
+  pareto: ParetoEntity[]
+  /** 集中度指标条 */
+  concentrationBars: ConcentrationBar[]
+  /** 纳税规模梯队 */
+  scaleTiers: ScaleTier[]
+  /** HHI 指数值 + 结论 */
+  hhi: string
+  /** HHI 结论说明 */
+  hhiNote: string
+  /** 税源流动(月度) */
+  flow: FlowMonth[]
+  /** 税源流动说明 */
+  flowNote: string
+  /** 行业结构演变·季度标签(len=8) */
+  quarters: string[]
+  /** 行业结构演变·各行业序列(自下而上堆叠) */
+  industries: IndustrySeries[]
+  /** 行业结构演变说明 */
+  industryNote: string
+  /** 区域气泡矩阵 */
+  bubbles: DistrictBubble[]
 }
 
 /** 治税成效分析 */
