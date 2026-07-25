@@ -22,6 +22,9 @@ import TopicAnalysisView from '@/views/decision/TopicAnalysisView.vue'
 import SourceMonitorView from '@/views/datagov/SourceMonitorView.vue'
 import QualityDashboardView from '@/views/datagov/QualityDashboardView.vue'
 import EntityMatchView from '@/views/datagov/EntityMatchView.vue'
+import DispatchView from '@/views/riskmgmt/DispatchView.vue'
+import BackfillView from '@/views/riskmgmt/BackfillView.vue'
+import PerformanceView from '@/views/riskmgmt/PerformanceView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import { MENU_LEAVES } from '@/config/menu'
 
@@ -41,6 +44,9 @@ const DONE_VIEWS: Record<string, Component> = {
   'data-source-monitor': SourceMonitorView,
   'data-quality': QualityDashboardView,
   'data-entity-match': EntityMatchView,
+  'risk-dispatch': DispatchView,
+  'risk-result': BackfillView,
+  'risk-performance': PerformanceView,
 }
 
 // 由菜单叶子生成子路由:去掉前导斜杠作为相对路径,meta.nav 供高亮/占位页取用

@@ -4,6 +4,7 @@
  * 展示文案属前端 UI 文本,不依赖后端下发。
  * ============================================================ */
 import type {
+  BackfillStatus,
   ClueStatus,
   DeltaTone,
   MatchStatus,
@@ -104,4 +105,20 @@ export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
   pending: '待确认',
   conflict: '存在冲突',
   rejected: '已排除',
+}
+
+/** 结果回填状态 → 语气 */
+export const BACKFILL_STATUS_TONE: Record<BackfillStatus, ToneName> = {
+  pending: 'pending',
+  draft: 'primary',
+  submitted: 'success',
+  returned: 'danger',
+}
+
+/** 结果回填状态 → 展示文案 */
+export const BACKFILL_STATUS_LABEL: Record<BackfillStatus, string> = {
+  pending: '待回填',
+  draft: '草稿',
+  submitted: '已提交',
+  returned: '被退回',
 }

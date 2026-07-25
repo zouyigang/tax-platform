@@ -16,9 +16,17 @@ import type {
   ClueFilters,
   ClueQuery,
   ClueRow,
+  BackfillFilters,
+  BackfillQuery,
+  BackfillRow,
   DashboardFilters,
   DashboardQuery,
   DataSourceMonitor,
+  DispatchBoard,
+  DispatchFilters,
+  DispatchQuery,
+  DispatchRow,
+  PerformanceStats,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
@@ -235,6 +243,38 @@ export const httpClient: ApiClient = {
     },
     getEntityMatchDetail(id: string): Promise<EntityMatchDetail> {
       return get<EntityMatchDetail>(`/datagov/entity-match/${encodeURIComponent(id)}`)
+    },
+  },
+
+  riskmgmt: {
+    getDispatchFilters(): Promise<DispatchFilters> {
+      return get<DispatchFilters>('/risk/dispatch/filters')
+    },
+    getDispatchBoard(): Promise<DispatchBoard> {
+      return get<DispatchBoard>('/risk/dispatch/board')
+    },
+    getDispatchList(query: DispatchQuery): Promise<PagedResult<DispatchRow>> {
+      return get<PagedResult<DispatchRow>>('/risk/dispatch', {
+        keyword: query.keyword,
+        districtCode: query.districtCode,
+        riskLevel: query.riskLevel,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getBackfillFilters(): Promise<BackfillFilters> {
+      return get<BackfillFilters>('/risk/backfill/filters')
+    },
+    getBackfillList(query: BackfillQuery): Promise<PagedResult<BackfillRow>> {
+      return get<PagedResult<BackfillRow>>('/risk/backfill', {
+        keyword: query.keyword,
+        status: query.status,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getPerformanceStats(): Promise<PerformanceStats> {
+      return get<PerformanceStats>('/risk/performance')
     },
   },
 }

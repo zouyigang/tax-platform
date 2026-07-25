@@ -19,9 +19,18 @@ import type {
   ClueRuleHit,
   ClueStatus,
   ComparisonModel,
+  BackfillFilters,
+  BackfillQuery,
+  BackfillRow,
+  BackfillStatus,
   DashboardFilters,
   DashboardQuery,
   DataSourceMonitor,
+  DispatchBoard,
+  DispatchFilters,
+  DispatchQuery,
+  DispatchRow,
+  PerformanceStats,
   DecisionFilters,
   DecisionQuery,
   DistrictCompletion,
@@ -799,6 +808,186 @@ export const mockClient: ApiClient = {
     getRuleDetail(id: string): Promise<RuleDetail> {
       const r = RULE_DATA.filter((x) => x.id === id)[0] || RULE_DATA[0]
       return delay(buildRuleDetail(r))
+    },
+  },
+
+  /* ==================== 风险管理 ==================== */
+  riskmgmt: {
+    getDispatchFilters(): Promise<DispatchFilters> {
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        districts: [
+          { value: 'all', label: '全部区县' },
+          { value: 'chengdong', label: '城东区' },
+          { value: 'gaoxin', label: '高新区' },
+          { value: 'linjiang', label: '临江县' },
+          { value: 'chengxi', label: '城西区' },
+          { value: 'yunling', label: '云岭县' },
+          { value: 'jiangbei', label: '江北新区' },
+        ],
+        riskLevels: [
+          { value: 'all', label: '全部等级' },
+          { value: 'high', label: '高风险' },
+          { value: 'mid', label: '中风险' },
+          { value: 'low', label: '低风险' },
+        ],
+        assignees: [
+          { value: 'auto', label: '按负荷自动分配' },
+          { value: 'wang', label: '王×× · 城东分局' },
+          { value: 'li', label: '李×× · 高新区分局' },
+          { value: 'zhang', label: '张×× · 城西分局' },
+          { value: 'chen', label: '陈×× · 经开区分局' },
+          { value: 'zhao', label: '赵×× · 城南分局' },
+        ],
+      })
+    },
+
+    getDispatchBoard(): Promise<DispatchBoard> {
+      const pending = CLUE_DATA.filter((c) => c.status === 'pending').length
+      return delay({
+        kpis: [
+          { label: '待派发线索', value: String(pending), unit: '条', accent: 'red' },
+          { label: '本月已派发', value: '486', unit: '条', accent: 'primary' },
+          { label: '平均派发时长', value: '4.2', unit: '小时', accent: 'teal' },
+          { label: '人员平均负荷', value: '68.4', unit: '%', accent: 'gold' },
+        ],
+        workloads: [
+          { name: '王××', dept: '城东分局', processing: 18, done: 42, capacity: 25, loadRate: 72 },
+          { name: '李××', dept: '高新区分局', processing: 22, done: 38, capacity: 25, loadRate: 88 },
+          { name: '张××', dept: '城西分局', processing: 12, done: 31, capacity: 25, loadRate: 48 },
+          { name: '陈××', dept: '经开区分局', processing: 16, done: 29, capacity: 25, loadRate: 64 },
+          { name: '赵××', dept: '城南分局', processing: 24, done: 26, capacity: 25, loadRate: 96 },
+          { name: '孙××', dept: '城北分局', processing: 9, done: 22, capacity: 25, loadRate: 36 },
+        ],
+      })
+    },
+
+    getDispatchList(query: DispatchQuery): Promise<PagedResult<DispatchRow>> {
+      const DISTRICT_CN: Record<string, string> = {
+        chengdong: '城东区', gaoxin: '高新区', linjiang: '临江县',
+        chengxi: '城西区', yunling: '云岭县', jiangbei: '江北新区',
+      }
+      const CAT_CN: Record<string, string> = {
+        invoice: '发票类', income: '收入类', register: '登记类', benefit: '优惠类',
+      }
+      const SUGGEST = ['王×× · 城东分局', '李×× · 高新区分局', '张×× · 城西分局', '陈×× · 经开区分局', '孙×× · 城北分局']
+      const kw = query.keyword.trim()
+      // 仅「待派发」线索进入派发池
+      const pool = CLUE_DATA.filter((c) => c.status === 'pending')
+      const filtered = pool.filter((c) => {
+        if (kw && c.taxpayerName.indexOf(kw) < 0 && c.id.indexOf(kw) < 0) return false
+        if (query.districtCode !== 'all' && c.districtCode !== query.districtCode) return false
+        if (query.riskLevel !== 'all' && c.riskLevel !== query.riskLevel) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      const items: DispatchRow[] = filtered.slice(start, start + query.pageSize).map((c, i) => ({
+        id: c.id,
+        taxpayerName: c.taxpayerName,
+        riskLevel: c.riskLevel,
+        estimatedTax: c.estimatedTax,
+        category: CAT_CN[c.categoryCode] || c.categoryCode,
+        district: DISTRICT_CN[c.districtCode] || c.districtCode,
+        createdDate: c.createdDate,
+        suggested: SUGGEST[i % SUGGEST.length],
+      }))
+      return delay({ items, total: filtered.length, page: query.page, pageSize: query.pageSize })
+    },
+
+    getBackfillFilters(): Promise<BackfillFilters> {
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        statuses: [
+          { value: 'all', label: '全部状态', count: 12 },
+          { value: 'pending', label: '待回填', count: 5 },
+          { value: 'draft', label: '草稿', count: 3 },
+          { value: 'submitted', label: '已提交', count: 3 },
+          { value: 'returned', label: '被退回', count: 1 },
+        ],
+        kpis: [
+          { label: '待回填任务', value: '5', unit: '项', accent: 'red' },
+          { label: '已逾期', value: '2', unit: '项', accent: 'gold' },
+          { label: '本月已回填', value: '38', unit: '项', accent: 'primary' },
+          { label: '按期回填率', value: '91.2', unit: '%', accent: 'green' },
+        ],
+      })
+    },
+
+    getBackfillList(query: BackfillQuery): Promise<PagedResult<BackfillRow>> {
+      const ASSIGNEE = ['王××', '李××', '张××', '陈××', '赵××']
+      const STATUS_CYCLE: BackfillStatus[] = ['pending', 'draft', 'submitted', 'pending', 'returned', 'submitted', 'draft', 'pending', 'submitted', 'draft', 'pending', 'pending']
+      // 处置中/已退回的线索进入回填队列
+      const pool = CLUE_DATA.filter((c) => c.status === 'processing' || c.status === 'returned').slice(0, 12)
+      const all: BackfillRow[] = pool.map((c, i) => {
+        const daysLeft = [3, 1, -2, 5, -1, 7, 2, 4, 6, 1, 8, 3][i]
+        return {
+          id: `HT2026-${(2100 + i).toString()}`,
+          clueId: c.id,
+          taxpayerName: c.taxpayerName,
+          riskLevel: c.riskLevel,
+          assignee: ASSIGNEE[i % ASSIGNEE.length],
+          dueDate: `2026-07-${String(24 + (daysLeft > 0 ? daysLeft : 0)).padStart(2, '0')}`,
+          daysLeft,
+          status: STATUS_CYCLE[i],
+        }
+      })
+      const kw = query.keyword.trim()
+      const filtered = all.filter((r) => {
+        if (kw && r.taxpayerName.indexOf(kw) < 0 && r.id.indexOf(kw) < 0 && r.clueId.indexOf(kw) < 0) return false
+        if (query.status !== 'all' && r.status !== query.status) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: filtered.slice(start, start + query.pageSize),
+        total: filtered.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getPerformanceStats(): Promise<PerformanceStats> {
+      return delay({
+        kpis: [
+          { label: '本年办结任务', value: '6,542', unit: '项', accent: 'primary' },
+          { label: '查实率', value: '74.5', unit: '%', accent: 'teal' },
+          { label: '入库税款', value: '3.42', unit: '亿元', accent: 'green' },
+          { label: '户均处置时长', value: '8.6', unit: '天', accent: 'gold' },
+        ],
+        trend: [
+          { label: '2月', value: 386 },
+          { label: '3月', value: 452 },
+          { label: '4月', value: 498 },
+          { label: '5月', value: 476 },
+          { label: '6月', value: 542 },
+          { label: '7月', value: 586 },
+        ],
+        deptRank: [
+          { name: '城东分局', value: 7840 },
+          { name: '高新区分局', value: 6920 },
+          { name: '城西分局', value: 5480 },
+          { name: '经开区分局', value: 4360 },
+          { name: '城南分局', value: 3210 },
+          { name: '城北分局', value: 2870 },
+        ],
+        durationDist: [
+          { name: '3 天内', value: 1240 },
+          { name: '3–7 天', value: 2180 },
+          { name: '7–15 天', value: 1860 },
+          { name: '15–30 天', value: 940 },
+          { name: '30 天以上', value: 322 },
+        ],
+        persons: [
+          { name: '王××', dept: '城东分局', assigned: 186, completed: 172, rate: 78.2, tax: 1840, avgDays: 7.4, mom: '+12.6%' },
+          { name: '李××', dept: '高新区分局', assigned: 172, completed: 164, rate: 81.5, tax: 1720, avgDays: 6.8, mom: '+18.3%' },
+          { name: '张××', dept: '城西分局', assigned: 145, completed: 132, rate: 72.8, tax: 1280, avgDays: 9.2, mom: '+6.4%' },
+          { name: '陈××', dept: '经开区分局', assigned: 138, completed: 126, rate: 74.1, tax: 1160, avgDays: 8.6, mom: '+9.1%' },
+          { name: '赵××', dept: '城南分局', assigned: 124, completed: 108, rate: 69.4, tax: 920, avgDays: 10.4, mom: '-2.8%' },
+          { name: '孙××', dept: '城北分局', assigned: 96, completed: 86, rate: 66.2, tax: 780, avgDays: 11.2, mom: '+4.2%' },
+          { name: '周××', dept: '临港分局', assigned: 84, completed: 78, rate: 71.8, tax: 690, avgDays: 9.8, mom: '+15.7%' },
+          { name: '吴××', dept: '江北分局', assigned: 72, completed: 62, rate: 63.5, tax: 540, avgDays: 12.6, mom: '-5.1%' },
+        ],
+      })
     },
   },
 

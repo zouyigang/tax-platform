@@ -1639,6 +1639,178 @@ export interface DataGovApi {
 }
 
 /* ========================================================================
+ * 九、风险管理（RiskMgmt）· 任务派发 / 结果回填 / 处置绩效统计
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》7.2 任务派发、7.4 核查结果反馈、7.5 处置绩效统计。
+ * 无设计稿,沿用既有列表 / 看板范式。
+ * ====================================================================== */
+
+/** 任务派发·人员负荷行 */
+export interface WorkloadRow {
+  /** 核查人员姓名 */
+  name: string
+  /** 所属分局 / 科室 */
+  dept: string
+  /** 在办任务数 */
+  processing: number
+  /** 本月已办结 */
+  done: number
+  /** 承载上限 */
+  capacity: number
+  /** 负荷率(百分数 = 在办 / 上限) */
+  loadRate: number
+}
+
+/** 任务派发·待派发线索行 */
+export interface DispatchRow {
+  /** 线索编号 */
+  id: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 预估税款(万元) */
+  estimatedTax: number
+  /** 规则类别 */
+  category: string
+  /** 所属区县 */
+  district: string
+  /** 生成日期 */
+  createdDate: string
+  /** 系统建议承办人 */
+  suggested: string
+}
+
+/** 任务派发·查询参数 */
+export interface DispatchQuery {
+  /** 名称 / 编号关键字 */
+  keyword: string
+  /** 区县代码;'all' 不限 */
+  districtCode: string
+  /** 风险等级;'all' 不限 */
+  riskLevel: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 任务派发·筛选项 */
+export interface DispatchFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 区县选项(含「全部区县」) */
+  districts: FilterOption[]
+  /** 风险等级选项(含「全部等级」) */
+  riskLevels: FilterOption[]
+  /** 可选承办人(派发弹窗用) */
+  assignees: FilterOption[]
+}
+
+/** 任务派发·概览 */
+export interface DispatchBoard {
+  /** 顶部指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+  /** 人员负荷 */
+  workloads: WorkloadRow[]
+}
+
+/** 回填状态:待回填 / 草稿 / 已提交 / 被退回 */
+export type BackfillStatus = 'pending' | 'draft' | 'submitted' | 'returned'
+
+/** 结果回填·任务行 */
+export interface BackfillRow {
+  /** 任务编号 */
+  id: string
+  /** 关联线索编号 */
+  clueId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 承办人 */
+  assignee: string
+  /** 要求回填期限 */
+  dueDate: string
+  /** 剩余天数;负数表示已逾期 */
+  daysLeft: number
+  /** 回填状态 */
+  status: BackfillStatus
+}
+
+/** 结果回填·查询参数 */
+export interface BackfillQuery {
+  /** 名称 / 编号关键字 */
+  keyword: string
+  /** 回填状态;'all' 不限 */
+  status: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 结果回填·筛选项与概览 */
+export interface BackfillFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 状态选项(附计数) */
+  statuses: Array<FilterOption & { count: number }>
+  /** 顶部指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 处置绩效·人员绩效行 */
+export interface PerfPersonRow {
+  /** 姓名 */
+  name: string
+  /** 所属分局 */
+  dept: string
+  /** 承办任务数 */
+  assigned: number
+  /** 已办结 */
+  completed: number
+  /** 查实率(百分数) */
+  rate: number
+  /** 入库税款(万元) */
+  tax: number
+  /** 户均耗时(天) */
+  avgDays: number
+  /** 环比文案(带符号) */
+  mom: string
+}
+
+/** 处置绩效统计 */
+export interface PerformanceStats {
+  /** 顶部指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+  /** 月度办结量趋势 */
+  trend: SeriesPoint[]
+  /** 分局入库税款排名(万元) */
+  deptRank: NamedValue[]
+  /** 处置时长分布(各区间任务数) */
+  durationDist: NamedValue[]
+  /** 人员绩效明细 */
+  persons: PerfPersonRow[]
+}
+
+/** 风险管理接口分组 */
+export interface RiskMgmtApi {
+  /** 任务派发·筛选项 */
+  getDispatchFilters(): Promise<DispatchFilters>
+  /** 任务派发·概览(指标 + 人员负荷) */
+  getDispatchBoard(): Promise<DispatchBoard>
+  /** 任务派发·待派发线索列表 */
+  getDispatchList(query: DispatchQuery): Promise<PagedResult<DispatchRow>>
+  /** 结果回填·筛选项与概览 */
+  getBackfillFilters(): Promise<BackfillFilters>
+  /** 结果回填·任务列表 */
+  getBackfillList(query: BackfillQuery): Promise<PagedResult<BackfillRow>>
+  /** 处置绩效统计 */
+  getPerformanceStats(): Promise<PerformanceStats>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -1658,4 +1830,6 @@ export interface ApiClient {
   decision: DecisionApi
   /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */
   datagov: DataGovApi
+  /** 风险管理 · 任务派发 / 结果回填 / 处置绩效 */
+  riskmgmt: RiskMgmtApi
 }
