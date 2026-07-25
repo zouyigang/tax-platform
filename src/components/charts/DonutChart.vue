@@ -72,19 +72,34 @@ const { el } = useChart(buildOption, () => props.segments)
 </template>
 
 <style scoped>
+/* 组件级令牌 · 设计稿中环形图的专有度量(不在全局字阶/间距刻度内) */
 .donut {
+  --donut-size: 190px;        /* 环形直径 */
+  --donut-gap: 20px;          /* 环形与图例间距 */
+  --donut-legend-gap: 9px;    /* 图例行间距 / 行内间距 */
+  --donut-swatch: 11px;       /* 图例色块边长 */
+  --donut-swatch-radius: 1px; /* 图例色块圆角 */
+  --donut-fs-total: 22px;     /* 环心总额字号 */
+
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: var(--donut-gap);
   min-height: 0;
+  /* 容器被压缩时裁剪而非向上溢出覆盖标题 */
+  overflow: hidden;
 }
 
+/* 环形随容器高度收缩:高度不足时自动变小,不再固定 190px 撑破面板。
+   ECharts 饼图半径按 min(宽,高) 计算,容器非正方形也仍是正圆。 */
 .donut__chart-wrap {
   position: relative;
-  width: 190px;
-  height: 190px;
   flex: none;
+  width: var(--donut-size);
+  max-width: 100%;
+  height: 100%;
+  max-height: var(--donut-size);
+  min-height: 0;
 }
 .donut__chart {
   width: 100%;
@@ -101,13 +116,13 @@ const { el } = useChart(buildOption, () => props.segments)
   pointer-events: none;
 }
 .donut__center-label {
-  font-size: 13px;
+  font-size: var(--fs-aux);
   color: var(--color-neutral-600);
   line-height: 1.4;
 }
 .donut__center-value {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: var(--donut-fs-total);
+  font-weight: var(--fw-semibold);
   color: var(--color-neutral-900);
   line-height: 1.3;
 }
@@ -116,20 +131,20 @@ const { el } = useChart(buildOption, () => props.segments)
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--donut-legend-gap);
   min-width: 0;
 }
 .donut__legend-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 13px;
+  gap: var(--donut-legend-gap);
+  font-size: var(--fs-aux);
 }
 .donut__swatch {
-  width: 11px;
-  height: 11px;
+  width: var(--donut-swatch);
+  height: var(--donut-swatch);
   flex: none;
-  border-radius: 1px;
+  border-radius: var(--donut-swatch-radius);
 }
 .donut__name {
   flex: 1;
@@ -139,6 +154,6 @@ const { el } = useChart(buildOption, () => props.segments)
   text-overflow: ellipsis;
 }
 .donut__pct {
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
 }
 </style>

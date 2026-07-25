@@ -7,12 +7,29 @@
  * ============================================================ */
 import type {
   ApiClient,
+  ArchiveDeclare,
+  ArchiveEvaluation,
+  ArchiveInvoice,
+  ArchiveSummary,
+  ClueDetail,
+  ClueDisposalOptions,
+  ClueFilters,
+  ClueQuery,
+  ClueRow,
   DashboardFilters,
   DashboardQuery,
   DistrictCompletion,
+  GraphData,
+  KeyValue,
   KpiCard,
+  PagedResult,
+  QaSession,
   RevenueTrend,
   RiskTaskFunnel,
+  RuleDetail,
+  RuleFilters,
+  RuleQuery,
+  RuleRow,
   SourceContribution,
   TaxTypeStructure,
 } from '../types'
@@ -88,6 +105,83 @@ export const httpClient: ApiClient = {
     },
     getRiskTaskFunnel(query: DashboardQuery): Promise<RiskTaskFunnel> {
       return get<RiskTaskFunnel>('/dashboard/risk-task-funnel', q(query))
+    },
+  },
+
+  clues: {
+    getClueFilters(): Promise<ClueFilters> {
+      return get<ClueFilters>('/clues/filters')
+    },
+    getClues(query: ClueQuery): Promise<PagedResult<ClueRow>> {
+      return get<PagedResult<ClueRow>>('/clues', {
+        keyword: query.keyword,
+        districtCode: query.districtCode,
+        categoryCode: query.categoryCode,
+        taxMin: query.taxMin === null ? undefined : query.taxMin,
+        taxMax: query.taxMax === null ? undefined : query.taxMax,
+        // 数组条件以逗号分隔传递
+        riskLevels: query.riskLevels.join(','),
+        statuses: query.statuses.join(','),
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getClueDetail(id: string): Promise<ClueDetail> {
+      return get<ClueDetail>(`/clues/${encodeURIComponent(id)}`)
+    },
+    getClueDisposalOptions(): Promise<ClueDisposalOptions> {
+      return get<ClueDisposalOptions>('/clues/disposal-options')
+    },
+  },
+
+  archive: {
+    getArchiveSummary(taxId: string): Promise<ArchiveSummary> {
+      return get<ArchiveSummary>(`/archive/${encodeURIComponent(taxId)}/summary`)
+    },
+    getArchiveProfile(taxId: string, section: 'base' | 'reg' | 'biz'): Promise<KeyValue[]> {
+      return get<KeyValue[]>(`/archive/${encodeURIComponent(taxId)}/profile`, { section })
+    },
+    getArchiveDeclare(taxId: string): Promise<ArchiveDeclare> {
+      return get<ArchiveDeclare>(`/archive/${encodeURIComponent(taxId)}/declare`)
+    },
+    getArchiveInvoice(taxId: string): Promise<ArchiveInvoice> {
+      return get<ArchiveInvoice>(`/archive/${encodeURIComponent(taxId)}/invoice`)
+    },
+    getArchiveEvaluation(taxId: string): Promise<ArchiveEvaluation> {
+      return get<ArchiveEvaluation>(`/archive/${encodeURIComponent(taxId)}/evaluation`)
+    },
+  },
+
+  rules: {
+    getRuleFilters(): Promise<RuleFilters> {
+      return get<RuleFilters>('/rules/filters')
+    },
+    getRules(query: RuleQuery): Promise<PagedResult<RuleRow>> {
+      return get<PagedResult<RuleRow>>('/rules', {
+        keyword: query.keyword,
+        categoryCode: query.categoryCode,
+        status: query.status,
+        taxType: query.taxType,
+        riskLevel: query.riskLevel,
+        model: query.model,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getRuleDetail(id: string): Promise<RuleDetail> {
+      return get<RuleDetail>(`/rules/${encodeURIComponent(id)}`)
+    },
+  },
+
+  qa: {
+    getQaSession(): Promise<QaSession> {
+      return get<QaSession>('/qa/session')
+    },
+  },
+
+  graph: {
+    getGraph(rootId: string): Promise<GraphData> {
+      return get<GraphData>('/graph', { rootId })
     },
   },
 }

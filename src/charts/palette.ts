@@ -2,7 +2,6 @@
  * 图表配色 · 前端设计令牌(后端不返回颜色)
  * 取值 1:1 对应《设计系统》「图表配色序列 · 8 色」与各页设计稿。
  * ============================================================ */
-import type { DeltaTone, KpiAccent } from '@/api/types'
 
 /** 图表配色序列 · 8 色(首色为政务蓝) */
 export const CHART_SERIES = [
@@ -32,6 +31,14 @@ export function districtColor(rank: number): string {
   return '#5FA8D3'
 }
 
+/** 进销项对比配色(销项主色 / 进项浅蓝) */
+export const INVOICE_IO = {
+  /** 销项 */
+  output: '#1D5A99',
+  /** 进项 */
+  input: '#5FA8D3',
+}
+
 /** 趋势图配色 */
 export const TREND = {
   /** 实际入库(实线) */
@@ -50,18 +57,52 @@ export const TREND = {
   monthLabel: '#6E7C8B',
 }
 
-/** KPI 卡片顶部色条:语义 → 色值 */
-export const KPI_ACCENT: Record<KpiAccent, string> = {
-  primary: '#1D5A99',
-  teal: '#2E7E93',
-  green: '#4E9D6B',
-  gold: '#C9A227',
-  red: '#C0392B',
+/** 规则效果监测·双轴折线配色(命中量=政务蓝 / 命中率=金) */
+export const RULE_EFFECT = {
+  /** 命中量(左轴,实线 + 面积) */
+  count: '#1D5A99',
+  /** 命中率(右轴,金色实线) */
+  rate: '#C9A227',
+  /** 数据点圆心填充 */
+  symbolFill: '#FFFFFF',
+  /** 命中量面积填充透明度 */
+  areaOpacity: 0.06,
+  /** 水平网格线 */
+  splitLine: '#EAEEF3',
+  /** 坐标轴刻度文字 */
+  axisLabel: '#97A3B0',
+  /** X 轴月份文字 */
+  monthLabel: '#6E7C8B',
 }
 
-/** KPI 变化文案:语义 → 色值 */
-export const DELTA_TONE: Record<DeltaTone, string> = {
-  positive: '#2E8757',
-  negative: '#C0392B',
-  neutral: '#6E7C8B',
+/** 关联图谱·节点类型配色(SVG 不能消费 CSS 变量,故与图表同置此处) */
+export const GRAPH_NODE_COLOR: Record<'ent' | 'person' | 'fund' | 'invoice', string> = {
+  ent: '#1D5A99', // 企业 · 政务蓝
+  person: '#2E8DA6', // 人员 · 青
+  fund: '#6E7C8B', // 资金账户 · 中性灰
+  invoice: '#C9A227', // 受票企业 · 金
 }
+
+/** 关联图谱·连线与文字配色 */
+export const GRAPH_EDGE = {
+  /** 与选中节点相连的高亮线 */
+  active: '#1D5A99',
+  /** 强关联(实线) */
+  strong: '#B7C2CE',
+  /** 弱关联(虚线) */
+  weak: '#DAE0E7',
+  /** 选中节点外环 */
+  selectedRing: '#1D5A99',
+  /** 连线标签文字 */
+  label: '#6E7C8B',
+  /** 文字白色描边(避免压线) */
+  halo: '#FFFFFF',
+  /** 节点名称文字 */
+  nodeLabel: '#1C2733',
+  /** 节点内图标文字 */
+  nodeIcon: '#FFFFFF',
+}
+
+// KPI 顶部色条与变化文案的取色已迁移:
+//   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
+//   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

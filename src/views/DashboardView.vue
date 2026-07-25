@@ -5,7 +5,7 @@
  * 取数一律经 @/api/client,不直接引用任何 adapter。
  * 每个数据区块独立四态(《交互说明》第 2 节)。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api/client'
 import type { DashboardPeriod, DashboardQuery } from '@/api/types'
@@ -13,7 +13,10 @@ import { useResource } from '@/composables/useResource'
 import StateBlock from '@/components/StateBlock.vue'
 import TrendChart from '@/components/charts/TrendChart.vue'
 import DonutChart from '@/components/charts/DonutChart.vue'
-import { DELTA_TONE, districtColor, FUNNEL_COLORS, KPI_ACCENT, SOURCE_COLORS } from '@/charts/palette'
+import MetricCard from '@/components/common/MetricCard.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
+import { DELTA_TONE } from '@/components/common/tone'
+import { districtColor, FUNNEL_COLORS, SOURCE_COLORS } from '@/charts/palette'
 
 const router = useRouter()
 
@@ -65,42 +68,12 @@ onMounted(async () => {
     districtCode.value = f.defaultDistrictCode
   }
   reloadRegions()
-  document.addEventListener('click', closeDistrictMenu)
-  document.addEventListener('keydown', onEsc)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('click', closeDistrictMenu)
-  document.removeEventListener('keydown', onEsc)
 })
 
 /* ---------------- 顶部筛选交互 ---------------- */
 function selectPeriod(value: string) {
   if (value === period.value) return
   period.value = value as DashboardPeriod
-  reloadRegions()
-}
-
-const districtOpen = ref(false)
-const districtLabel = computed(() => {
-  const list = filters.data.value ? filters.data.value.districts : []
-  const hit = list.filter((d) => d.value === districtCode.value)[0]
-  return hit ? hit.label : ''
-})
-function toggleDistrictMenu(e: MouseEvent) {
-  e.stopPropagation()
-  districtOpen.value = !districtOpen.value
-}
-function closeDistrictMenu() {
-  districtOpen.value = false
-}
-function onEsc(e: KeyboardEvent) {
-  if (e.key === 'Escape') districtOpen.value = false
-}
-function selectDistrict(value: string) {
-  districtOpen.value = false
-  if (value === districtCode.value) return
-  districtCode.value = value
   reloadRegions()
 }
 
@@ -195,21 +168,14 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
         <span v-else class="skeleton dash__seg-skeleton"></span>
 
         <!-- 区县筛选 -->
-        <div v-if="filters.status.value === 'ready'" class="select" @click="toggleDistrictMenu">
-          <span>{{ districtLabel }}</span>
-          <span class="select__caret">▾</span>
-          <div v-if="districtOpen" class="select__menu" @click.stop>
-            <div
-              v-for="d in filters.data.value ? filters.data.value.districts : []"
-              :key="d.value"
-              class="select__option"
-              :class="{ 'select__option--on': d.value === districtCode }"
-              @click="selectDistrict(d.value)"
-            >
-              {{ d.label }}
-            </div>
-          </div>
-        </div>
+        <BaseSelect
+          v-if="filters.status.value === 'ready'"
+          v-model="districtCode"
+          :options="filters.data.value!.districts"
+          width="var(--dash-select-w)"
+          height="var(--dash-control-h)"
+          @update:model-value="reloadRegions"
+        />
         <span v-else class="skeleton dash__select-skeleton"></span>
       </div>
     </header>
@@ -218,31 +184,28 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
       <!-- ══ 指标区(5 卡) ══ -->
       <div class="kpis">
         <template v-if="kpis.status.value === 'ready'">
-          <div
+          <MetricCard
             v-for="k in kpis.data.value"
             :key="k.key"
-            class="kpi"
-            :class="{ 'kpi--link': !!k.linkTo }"
-            :style="{ borderTopColor: KPI_ACCENT[k.accent] }"
+            :label="k.label"
+            :value="k.value"
+            :unit="k.unit"
+            :accent="k.accent"
+            :delta="k.delta"
+            :delta-tone="DELTA_TONE[k.deltaTone]"
+            :delta-note="k.deltaNote"
+            :clickable="!!k.linkTo"
+            size="lg"
+            variant="card"
             @click="onKpiClick(k.linkTo)"
-          >
-            <div class="kpi__label">{{ k.label }}</div>
-            <div class="kpi__value num">
-              {{ k.value }}<span class="kpi__unit">{{ k.unit }}</span>
-            </div>
-            <div class="kpi__delta">
-              <span :style="{ color: DELTA_TONE[k.deltaTone] }" class="kpi__delta-value">{{ k.delta }}</span>
-              <span class="kpi__delta-note">{{ k.deltaNote }}</span>
-            </div>
-          </div>
+          />
         </template>
 
         <!-- 指标卡加载态:数值位置显示等宽灰条 -->
         <template v-else-if="kpis.status.value === 'loading' || kpis.status.value === 'idle'">
-          <div v-for="n in 5" :key="n" class="kpi">
-            <div class="kpi__label">&nbsp;</div>
-            <div class="skeleton kpi__value-skeleton"></div>
-            <div class="skeleton kpi__delta-skeleton"></div>
+          <div v-for="n in 5" :key="n" class="kpi-skeleton">
+            <div class="skeleton kpi-skeleton__value"></div>
+            <div class="skeleton kpi-skeleton__delta"></div>
           </div>
         </template>
 
@@ -414,33 +377,94 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
 /* ══ 页面骨架 ══ */
 .dash {
   height: 100%;
+  /* 视口不足时不再压缩内容,交由内容区滚动 */
+  min-height: var(--dash-min-h);
   background: var(--color-bg);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * 页面级令牌 · 仅领导驾驶舱使用
+ * 这些数值来自设计稿,但不在《设计系统》的字阶与 4px 间距刻度
+ * (4/8/12/16/24/32/48)之内,属本页专有度量,故就近定义在页面根节点,
+ * 不写入 tokens.css —— tokens.css 只承载全局设计系统。
+ * CSS 自定义属性沿 DOM 继承,页内子组件可直接引用。
+ * ══════════════════════════════════════════════════════════════ */
+.dash {
+  /* 字号 */
+  --dash-fs-kpi-value: 38px;    /* 指标卡主数值 */
+  --dash-fs-kpi-unit: 15px;     /* 指标卡单位 */
+  --dash-fs-emphasis: 15px;     /* 整体转化率等强调数字 */
+  --dash-fs-funnel-value: 24px; /* 漏斗环节数值 */
+
+  /* 间距 */
+  --dash-pad-x: 28px;           /* 页面左右外边距 */
+  --dash-gap: 20px;             /* 卡片 / 面板栅格间距 */
+  --dash-panel-pad: 18px 22px;  /* 面板内边距 */
+  --dash-funnel-pad: 16px 22px; /* 漏斗面板内边距 */
+  --dash-title-gap: 14px;       /* 主标题与副标题间距 */
+  --dash-bar-gap: 14px;         /* 条形行内元素间距 */
+  --dash-head-mb: 6px;          /* 面板标题下间距 */
+  --dash-inline-gap: 6px;       /* 图例项内 / 数值与单位间距 */
+  --dash-series-gap: 18px;      /* 图例与柱状列间距 */
+  --dash-seg-pad: 7px 18px;     /* 分段控件内边距 */
+  --dash-option-pad: 7px 12px;  /* 下拉选项内边距 */
+
+  /* 尺寸 */
+  --dash-header-h: 68px;        /* 顶部标题栏高 */
+  --dash-kpi-row-h: 148px;      /* 指标行高 */
+  --dash-kpi-accent-h: 3px;     /* 指标卡顶部色条 */
+  --dash-funnel-h: 196px;       /* 漏斗面板高 */
+  --dash-control-h: 34px;       /* 筛选控件高 */
+  --dash-select-w: 128px;       /* 区县下拉宽 */
+  --dash-menu-max-h: 280px;     /* 下拉面板最大高 */
+  --dash-accent-w: 4px;         /* 标题栏色条宽 */
+  --dash-accent-h: 30px;        /* 标题栏色条高 */
+  --dash-bar-name-w: 64px;      /* 区县名列宽 */
+  --dash-bar-pct-w: 48px;       /* 完成率列宽 */
+  --dash-track-h: 16px;         /* 条形轨道高 */
+  --dash-col-max-w: 56px;       /* 柱体最大宽 */
+  --dash-legend-mark-w: 16px;   /* 图例色标宽 */
+  --dash-legend-mark-h: 2px;    /* 图例色标线高 */
+  --dash-bar-radius: 1px;       /* 条形 / 柱体圆角 */
+
+  /* 看板最小高度:低于此值各行会被压穿(环形图/条形列表有固有最小高度),
+     此时改为整体滚动,而非让内容溢出互相覆盖。
+     = 68 顶栏 + 48 内边距 + 148 指标 + 216 中部 + 192 下部 + 196 漏斗 + 60 间距 */
+  --dash-min-h: 940px;
+
+  /* 骨架屏占位尺寸 */
+  --dash-skel-updated-w: 168px;
+  --dash-skel-seg-w: 176px;
+  --dash-skel-kpi-w: 92px;
+  --dash-skel-delta-w: 120px;
+  --dash-skel-line-h: 14px;
+  --dash-skel-delta-h: 13px;
+}
+
 /* ══ 顶部标题栏 ══ */
 .dash__header {
-  height: 68px;
+  height: var(--dash-header-h);
   flex: none;
   background: var(--color-panel);
   border-bottom: var(--border-line);
   display: flex;
   align-items: center;
-  padding: 0 28px;
-  gap: 20px;
+  padding: 0 var(--dash-pad-x);
+  gap: var(--dash-gap);
 }
 .dash__accent {
-  width: 4px;
-  height: 30px;
+  width: var(--dash-accent-w);
+  height: var(--dash-accent-h);
   background: var(--color-primary);
   flex: none;
 }
 .dash__titles {
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: var(--dash-title-gap);
 }
 .dash__h1 {
   font-size: var(--fs-h1);
@@ -466,16 +490,16 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   white-space: nowrap;
 }
 .dash__updated-skeleton {
-  width: 168px;
-  height: 14px;
+  width: var(--dash-skel-updated-w);
+  height: var(--dash-skel-line-h);
 }
 .dash__seg-skeleton {
-  width: 176px;
-  height: 34px;
+  width: var(--dash-skel-seg-w);
+  height: var(--dash-control-h);
 }
 .dash__select-skeleton {
-  width: 128px;
-  height: 34px;
+  width: var(--dash-select-w);
+  height: var(--dash-control-h);
 }
 
 /* 分段筛选 */
@@ -486,7 +510,7 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   overflow: hidden;
 }
 .seg__item {
-  padding: 7px 18px;
+  padding: var(--dash-seg-pad);
   font-size: var(--fs-aux);
   cursor: pointer;
   background: var(--color-panel);
@@ -506,62 +530,13 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   color: var(--color-text-inverse);
 }
 
-/* 区县下拉 */
-.select {
-  position: relative;
-  min-width: 128px;
-  height: 34px;
-  padding: 0 12px;
-  border: var(--border-line);
-  border-radius: var(--radius-control);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: var(--fs-aux);
-  background: var(--color-panel);
-  cursor: pointer;
-  user-select: none;
-}
-.select__caret {
-  color: var(--color-neutral-500);
-  margin-left: var(--space-2);
-}
-.select__menu {
-  position: absolute;
-  top: 36px;
-  left: 0;
-  right: 0;
-  z-index: 20;
-  background: var(--color-panel);
-  border: var(--border-line);
-  border-radius: var(--radius-control);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-1) 0;
-  max-height: 280px;
-  overflow: auto;
-}
-.select__option {
-  padding: 7px 12px;
-  font-size: var(--fs-aux);
-  color: var(--color-neutral-700);
-  white-space: nowrap;
-}
-.select__option:hover {
-  background: var(--color-neutral-100);
-}
-.select__option--on {
-  color: var(--color-primary);
-  background: var(--color-primary-tint);
-  font-weight: var(--fw-semibold);
-}
-
 /* ══ 主体 ══ */
 .dash__body {
   flex: 1;
-  padding: 24px 28px;
+  padding: var(--space-6) var(--dash-pad-x);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--dash-gap);
   min-height: 0;
 }
 
@@ -569,29 +544,9 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
 .kpis {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 20px;
-  height: 148px;
+  gap: var(--dash-gap);
+  height: var(--dash-kpi-row-h);
   flex: none;
-}
-.kpi {
-  background: var(--color-panel);
-  border: var(--border-line);
-  border-radius: var(--radius-control);
-  border-top: 3px solid var(--color-primary);
-  padding: 18px 22px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-.kpi--link {
-  cursor: pointer;
-  transition: border-color var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
-}
-.kpi--link:hover {
-  border-left-color: var(--color-neutral-400);
-  border-right-color: var(--color-neutral-400);
-  border-bottom-color: var(--color-neutral-400);
-  box-shadow: var(--shadow-sm);
 }
 /* 指标区空态/错误态:横跨整行 */
 .kpis__state {
@@ -602,46 +557,31 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   display: flex;
   flex-direction: column;
 }
-.kpi__label {
-  font-size: var(--fs-body);
-  color: var(--color-text-sub);
-}
-.kpi__value {
-  font-size: 38px;
-  font-weight: var(--fw-semibold);
-  line-height: 1;
-}
-.kpi__unit {
-  font-size: 15px; /* 设计稿特定字号(令牌无对应值) */
-  font-weight: var(--fw-regular);
-  color: var(--color-neutral-600);
-  margin-left: 6px;
-}
-.kpi__delta {
+/* 指标卡加载态占位(与 MetricCard 卡片外形一致) */
+.kpi-skeleton {
+  background: var(--color-panel);
+  border: var(--border-line);
+  border-top: var(--dash-kpi-accent-h) solid var(--color-neutral-300);
+  border-radius: var(--radius-control);
+  padding: var(--dash-panel-pad);
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--fs-aux);
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-3);
 }
-.kpi__delta-value {
-  font-weight: var(--fw-semibold);
+.kpi-skeleton__value {
+  width: var(--dash-skel-kpi-w);
+  height: var(--dash-control-h);
 }
-.kpi__delta-note {
-  color: var(--color-neutral-600);
-}
-.kpi__value-skeleton {
-  width: 92px;
-  height: 34px;
-}
-.kpi__delta-skeleton {
-  width: 120px;
-  height: 13px;
+.kpi-skeleton__delta {
+  width: var(--dash-skel-delta-w);
+  height: var(--dash-skel-delta-h);
 }
 
 /* ══ 面板通用 ══ */
 .row {
   display: grid;
-  gap: 20px;
+  gap: var(--dash-gap);
   flex: 1;
   min-height: 0;
 }
@@ -655,21 +595,23 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   background: var(--color-panel);
   border: var(--border-line);
   border-radius: var(--radius-control);
-  padding: 18px 22px;
+  padding: var(--dash-panel-pad);
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* 兜底:内容仍超出时在面板内裁剪,不越界覆盖相邻区块 */
+  overflow: hidden;
 }
 .panel--funnel {
-  height: 196px;
+  height: var(--dash-funnel-h);
   flex: none;
-  padding: 16px 22px;
+  padding: var(--dash-funnel-pad);
 }
 .panel__head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: var(--dash-head-mb);
 }
 .panel__head--gap12 {
   margin-bottom: var(--space-3);
@@ -683,7 +625,7 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   margin: 0;
 }
 .panel__title--solo {
-  margin: 0 0 6px;
+  margin: 0 0 var(--dash-head-mb);
 }
 .panel__note {
   font-size: var(--fs-label);
@@ -696,30 +638,30 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
 .panel__note-em {
   color: var(--color-primary);
   font-weight: var(--fw-semibold);
-  font-size: 15px;
+  font-size: var(--dash-fs-emphasis);
 }
 
 /* 趋势图例 */
 .legend {
   display: flex;
-  gap: 18px;
+  gap: var(--dash-series-gap);
   font-size: var(--fs-label);
   color: var(--color-neutral-600);
 }
 .legend__item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--dash-inline-gap);
 }
 .legend__line {
-  width: 16px;
-  height: 2px;
+  width: var(--dash-legend-mark-w);
+  height: var(--dash-legend-mark-h);
   background: var(--color-primary);
 }
 .legend__dash {
-  width: 16px;
+  width: var(--dash-legend-mark-w);
   height: 0;
-  border-top: 2px dashed var(--color-neutral-500);
+  border-top: var(--dash-legend-mark-h) dashed var(--color-neutral-500);
 }
 .legend__unit {
   color: var(--color-neutral-500);
@@ -732,14 +674,15 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   flex-direction: column;
   justify-content: space-between;
   min-height: 0;
+  overflow: hidden;
 }
 .bar-row {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--dash-bar-gap);
 }
 .bar-row__name {
-  width: 64px;
+  width: var(--dash-bar-name-w);
   font-size: var(--fs-aux);
   color: var(--color-neutral-700);
   flex: none;
@@ -748,20 +691,20 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
 }
 .bar-row__track {
   flex: 1;
-  height: 16px;
+  height: var(--dash-track-h);
   background: var(--color-neutral-200);
   position: relative;
-  border-radius: 1px;
+  border-radius: var(--dash-bar-radius);
 }
 .bar-row__fill {
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  border-radius: 1px;
+  border-radius: var(--dash-bar-radius);
 }
 .bar-row__pct {
-  width: 48px;
+  width: var(--dash-bar-pct-w);
   font-size: var(--fs-aux);
   font-weight: var(--fw-semibold);
   flex: none;
@@ -772,9 +715,10 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   flex: 1;
   display: flex;
   align-items: flex-end;
-  gap: 18px;
+  gap: var(--dash-series-gap);
   padding: 0 var(--space-1);
   min-height: 0;
+  overflow: hidden;
 }
 .col {
   flex: 1;
@@ -792,8 +736,8 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
 }
 .col__bar {
   width: 100%;
-  max-width: 56px;
-  border-radius: 1px 1px 0 0;
+  max-width: var(--dash-col-max-w);
+  border-radius: var(--dash-bar-radius) var(--dash-bar-radius) 0 0;
 }
 .col__name {
   font-size: var(--fs-label);
@@ -821,7 +765,7 @@ const trendUnit = computed(() => (trend.data.value ? trend.data.value.unit : '')
   fill: var(--color-neutral-600);
 }
 .funnel__value {
-  font-size: 24px; /* 漏斗内数值,设计稿特定字号(令牌无对应值) */
+  font-size: var(--dash-fs-funnel-value);
   font-weight: var(--fw-semibold);
   fill: var(--color-text-inverse);
 }

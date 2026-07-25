@@ -1,19 +1,40 @@
 /* ============================================================
  * 路由 · 全部业务页作为 MainLayout 的子路由（共用侧栏）
+ * 路由由 menu.ts 唯一菜单配置生成:
+ *   - status='done'        映射到真实页面组件;
+ *   - status='placeholder' 统一落 PlaceholderView 占位页。
  * 静态演示工程使用 hash 路由,便于任意静态服务器/文件直开。
  * ============================================================ */
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
+import type { Component } from 'vue'
 import MainLayout from '@/layouts/MainLayout.vue'
 import DashboardView from '@/views/DashboardView.vue'
+import RiskPoolView from '@/views/RiskPoolView.vue'
+import CluesView from '@/views/CluesView.vue'
+import ArchiveView from '@/views/ArchiveView.vue'
+import RuleConfigView from '@/views/RuleConfigView.vue'
+import QaView from '@/views/QaView.vue'
+import GraphView from '@/views/GraphView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
-import { NAV_ITEMS } from '@/config/nav'
+import { MENU_LEAVES } from '@/config/menu'
 
-// 由导航配置生成占位路由（本轮未实现的页面）
-const placeholderRoutes: RouteRecordRaw[] = NAV_ITEMS.filter((n) => !n.built).map((n) => ({
-  path: n.to.replace(/^\//, '').split('?')[0],
-  name: n.name,
-  component: PlaceholderView,
-  meta: { nav: n.name },
+// 已实现叶子 key → 真实组件(其余走占位页)
+const DONE_VIEWS: Record<string, Component> = {
+  dashboard: DashboardView,
+  'risk-pool': RiskPoolView,
+  clues: CluesView,
+  archive: ArchiveView,
+  'rules-config': RuleConfigView,
+  'app-qa': QaView,
+  'model-graph': GraphView,
+}
+
+// 由菜单叶子生成子路由:去掉前导斜杠作为相对路径,meta.nav 供高亮/占位页取用
+const menuRoutes: RouteRecordRaw[] = MENU_LEAVES.map((leaf) => ({
+  path: leaf.path.replace(/^\//, ''),
+  name: leaf.key,
+  component: leaf.status === 'done' ? DONE_VIEWS[leaf.key] ?? PlaceholderView : PlaceholderView,
+  meta: { nav: leaf.key, title: leaf.title },
 }))
 
 const routes: RouteRecordRaw[] = [
@@ -22,13 +43,14 @@ const routes: RouteRecordRaw[] = [
     component: MainLayout,
     children: [
       { path: '', redirect: '/dashboard' },
+      ...menuRoutes,
+      // 核查处置工作台按线索逐条办理:/clues/:id 复用同一组件(菜单项 /clues 为引导空态)
       {
-        path: 'dashboard',
-        name: '领导驾驶舱',
-        component: DashboardView,
-        meta: { nav: '领导驾驶舱' },
+        path: 'clues/:id',
+        name: 'clues-detail',
+        component: CluesView,
+        meta: { nav: 'clues', title: '核查处置工作台' },
       },
-      ...placeholderRoutes,
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },

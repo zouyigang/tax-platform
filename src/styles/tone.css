@@ -1,0 +1,50 @@
+/* ============================================================
+ * 语气(tone)工具类
+ * 后端只返回语义(danger/warn/success…),前端在此统一映射到设计令牌。
+ * 每个 tone 暴露三个变量,供徽章 / 指标 / 色条等组件取用:
+ *   --tone-main  主色(圆点、色条、描边)
+ *   --tone-text  文字色(保证对比度)
+ *   --tone-tint  底纹色
+ * ============================================================ */
+
+.tone-default {
+  --tone-main: var(--color-neutral-900);
+  --tone-text: var(--color-neutral-900);
+  --tone-tint: var(--color-neutral-100);
+}
+.tone-primary {
+  --tone-main: var(--color-primary);
+  --tone-text: var(--color-primary-deep);
+  --tone-tint: var(--color-primary-tint);
+}
+.tone-neutral {
+  --tone-main: var(--color-status-done);
+  --tone-text: var(--color-status-done-text);
+  --tone-tint: var(--color-status-done-tint);
+}
+.tone-danger {
+  --tone-main: var(--color-risk-high);
+  --tone-text: var(--color-risk-high-text);
+  --tone-tint: var(--color-risk-high-tint);
+}
+.tone-warn {
+  --tone-main: var(--color-risk-mid);
+  --tone-text: var(--color-risk-mid-text);
+  --tone-tint: var(--color-risk-mid-tint);
+}
+.tone-gold {
+  --tone-main: var(--color-risk-low);
+  --tone-text: var(--color-risk-low-text);
+  --tone-tint: var(--color-risk-low-tint);
+}
+.tone-success {
+  --tone-main: var(--color-status-normal);
+  --tone-text: var(--color-status-normal-text);
+  --tone-tint: var(--color-status-normal-tint);
+}
+/* 待派发:与「中风险」橙色相近但取自处置状态色板 */
+.tone-pending {
+  --tone-main: var(--color-status-pending);
+  --tone-text: var(--color-status-pending-text);
+  --tone-tint: var(--color-status-pending-tint);
+}

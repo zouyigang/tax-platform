@@ -68,6 +68,13 @@
   --chart-7: #B0574E;  /* 砖红 */
   --chart-8: #7A6FA6;  /* 紫 */
 
+  /* ---------- 指标卡顶部色条(语义 → 色值) ---------- */
+  --kpi-accent-primary: var(--color-primary);
+  --kpi-accent-teal: var(--color-secondary-teal);
+  --kpi-accent-green: var(--chart-4);
+  --kpi-accent-gold: var(--chart-5);
+  --kpi-accent-red: var(--color-risk-high);
+
   /* ---------- 字体栈（仅系统字体，无任何 Web 字体） ---------- */
   --font-sans: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Source Han Sans SC", "Noto Sans SC", system-ui, sans-serif;
   --font-serif: "Source Han Serif SC", "宋体", SimSun, serif; /* 少量:正式落款 / 文号 */
@@ -79,6 +86,7 @@
   --fs-body: 14px; --fw-body: 400; --lh-body: 1.6; /* 正文 */
   --fs-aux: 13px;  --lh-aux: 1.6;                  /* 辅助说明 */
   --fs-label: 12px; --fw-label: 500;               /* 标签 / 表头 */
+  --fs-micro: 11px;                                /* 微型辅助文字（单元格小标签 / 角标） */
   --fs-metric: 32px; --fw-metric: 600; --lh-metric: 1.2; /* 指标大数字 */
   --fw-regular: 400;   /* 通用字重 */
   --fw-medium: 500;
@@ -100,6 +108,7 @@
   --border-accent: 1px solid var(--color-primary);     /* 选中 / 强调 */
   --shadow-sm: 0 1px 2px rgba(28, 39, 51, 0.06);       /* 下拉 */
   --shadow-md: 0 4px 16px rgba(28, 39, 51, 0.12);      /* 弹窗 */
+  --shadow-drawer: -8px 0 24px rgba(28, 39, 51, 0.10); /* 右侧抽屉 */
   --overlay-mask: rgba(28, 39, 51, 0.5);               /* 弹窗遮罩 */
 
   /* ---------- 布局 ---------- */
