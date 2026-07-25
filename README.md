@@ -3,8 +3,12 @@
 面向地市级税务局的政务内网系统前端演示工程。
 技术栈 **Vue 3 + Vite + Vue Router + ECharts**，**不引入任何 UI 组件库**，全部组件自绘。
 
-视觉与布局 1:1 复刻 Claude Design 设计稿，设计令牌以 `src/styles/tokens.css` 为唯一来源。
+视觉与布局 1:1 复刻设计稿，设计令牌以 `src/styles/tokens.css` 为唯一来源。
 基调：专业、克制、可信 —— 不做互联网产品的活泼感，不做大屏炫光效果。
+
+设计稿来源两处：Claude Design 项目（7 页业务稿 + 设计系统 / 平台侧栏 / 交互说明），
+以及 `doc/` 目录下的决策分析高保真交付包（4 张 `.dc.html` + handoff 说明）。
+`doc/` 仅作实现参考，不参与构建。
 
 ---
 
@@ -108,19 +112,25 @@ npm run preview    # 以静态服务器预览 dist/，默认 http://localhost:41
 
 ### 2. 业务模块（9 一级 / 34 二级）
 
-已实现 **7 个业务页面**（源自 6 张设计稿，其中「风险线索工作台」按需求拆为「列表」与「核查处置」两页）：
+已实现 **11 个业务页面**（源自 10 张设计稿：Design 项目 6 张 + `doc/` 决策分析交付包 4 张；
+其中「风险线索工作台」一稿按需求拆为「列表」与「核查处置」两页）：
 
-| 一级菜单 | 二级（已实现） | 路由 |
-|---|---|---|
-| 首页驾驶舱 | 首页驾驶舱 | `/#/dashboard` |
-| 数据治理 | 一户式主档查询 | `/#/archive` |
-| 风险管理 | 风险线索池 | `/#/risk-pool` |
-| 风险管理 | 核查处置工作台 | `/#/clues`、`/#/clues/:id` |
-| 规则库管理 | 规则配置 | `/#/rules/config` |
-| 智能模型 | 关联图谱分析 | `/#/model/graph` |
-| 智能应用 | 政策智能问答 | `/#/app/qa` |
+| 一级菜单 | 二级（已实现） | 路由 | 设计稿来源 |
+|---|---|---|---|
+| 首页驾驶舱 | 首页驾驶舱 | `/#/dashboard` | Design |
+| 数据治理 | 一户式主档查询 | `/#/archive` | Design |
+| 风险管理 | 风险线索池 | `/#/risk-pool` | Design（拆分） |
+| 风险管理 | 核查处置工作台 | `/#/clues`、`/#/clues/:id` | Design（拆分）+ 需求 7.4 |
+| 规则库管理 | 规则配置 | `/#/rules/config` | 显式规格 |
+| 智能模型 | 关联图谱分析 | `/#/model/graph` | Design |
+| 智能应用 | 政策智能问答 | `/#/app/qa` | Design |
+| **决策分析** | **收入分析** | `/#/decision/revenue` | `doc/` |
+| **决策分析** | **税源分析** | `/#/decision/tax-source` | `doc/` |
+| **决策分析** | **治税成效分析** | `/#/decision/effectiveness` | `doc/` |
+| **决策分析** | **专题分析** | `/#/decision/topic` | `doc/` |
 
-其余 **27 个二级**（数据治理 / 风险管理 / 规则库管理 / 智能模型 / 税源监控 / 智能应用 / 决策分析 / 系统管理下的未建项）无对应设计稿，统一落 `PlaceholderView`。
+其余 **23 个二级**（数据治理 / 风险管理 / 规则库管理 / 智能模型 / 税源监控 / 智能应用 / 系统管理下的未建项）
+无对应设计稿，统一落 `PlaceholderView`。
 
 ### 3. 领导驾驶舱页面结构
 
@@ -139,7 +149,27 @@ npm run preview    # 以静态服务器预览 dist/，默认 http://localhost:41
 > 图表策略：趋势与环形用 ECharts；区县条形、数据源柱状、漏斗为设计稿中的定制图形，
 > 按原样以 DOM/SVG 复刻以保证像素级还原。
 
-### 4. 页面跳转关系
+### 4. 决策分析模块（4 页）
+
+依据 `doc/` 下的高保真交付包（`README.md` + 4 张 `.dc.html` + 《交互说明》）**像素级复刻**。
+四页共享顶栏筛选（时间 / 区县 / 导出）与全站统一悬停 Tooltip；筛选、tab、排序、分页、
+节点选中均为**页面本地 state，不跳路由**。
+
+| 页面 | 核心可视化 | 交互 |
+|---|---|---|
+| **收入分析** | 双进度条（时间/收入）+ 红色**序时线**标记；同比归因**瀑布**（SVG）；分级次**堆叠柱**（DOM）；全年预测折线 + **90% 置信区间**（SVG） | 表头排序（▲▼/⇅）；**点击行下钻区县子行**；图元悬停 tooltip |
+| **税源分析** | **帕累托**（TOP15 柱 + 累计占比线 + 80% 参考线）；集中度 CR5/10/50 + **对数宽度**规模梯队；税源流动**双向柱**（零基线上下堆叠）；行业结构 **100% 堆叠面积**；区域**气泡矩阵**（均值虚线四象限） | 6 处图元悬停明细；区县排行联动阅读 |
+| **治税成效分析** | 5 环节**闭环链条** + 96px 连接器（转化率徽章 / 流失去向）；下钻明细 3 列迷你条；数据源横条；规则引擎 vs 智能模型**分组柱** | **点击环节**切换下钻明细；对比维度 3 tab；排行表排序 + 分页 |
+| **专题分析** | 房地产**六环节链条**（税种芯片 + 风险角标）；建筑安装**合规象限散点**（右下风险区底纹）；平台经济卡 + 商户分布**双柱直方图** | **专题 tab 切换替换整个内容区**；节点 / 平台卡选中；风险清单联动 |
+
+图形实现方式：**原生 SVG / DOM 绘制**（非 ECharts）——设计稿为逐坐标定制图形，
+自绘才能保证 1:1；几何计算（瀑布累计、对数宽度、气泡半径、置信区间多边形、象限阈值）
+全部在组件内完成，接口只下发业务数值。
+
+配套复用件：`composables/useTooltip.ts` + `components/charts/ChartTooltip.vue`
+（fixed 定位、视口边缘钳位、下缘自动翻转），四页共用。
+
+### 5. 页面跳转关系
 
 已实现（依据《交互说明》1.2）：
 
@@ -152,6 +182,8 @@ npm run preview    # 以静态服务器预览 dist/，默认 http://localhost:41
 | 风险线索池 · 行 / 「核查」 | `/#/clues/:id`（核查处置整页） |
 | 图谱节点 · 「查看档案」 | `/#/archive` |
 | 政策问答 · 答案文号溯源芯片 | 高亮右侧引用来源并滚动定位（同页） |
+| 专题分析 · 「转入风险线索工作台 ›」 | `/#/risk-pool` |
+| 决策分析 · 排序 / 下钻 / tab / 分页 / 节点选中 | 页面本地 state，**不跳路由**（依据 handoff） |
 
 设计稿中定义、**待后续轮次接入**：区县条形点击 → `?district=`；漏斗环节点击 → `?stage=`。
 
@@ -174,7 +206,8 @@ npm run preview    # 以静态服务器预览 dist/，默认 http://localhost:41
    接口契约             api/types.ts              ← 双适配器共同实现，编译期约束
 ```
 
-接口按业务分组：`dashboard` / `clues` / `archive` / `rules` / `qa` / `graph`，各组方法签名由 `ApiClient` 统一约束。
+接口按业务分组：`dashboard` / `clues` / `archive` / `rules` / `qa` / `graph` / `decision`，
+各组方法签名由 `ApiClient` 统一约束。
 
 ### 2. 目录结构
 
@@ -194,11 +227,13 @@ src/
 │   ├── AppSidebar.vue    # 全局两级折叠侧栏
 │   ├── StateBlock.vue    # 四态容器
 │   ├── charts/           # TrendChart / DonutChart / InvoiceBarChart / RuleEffectChart
+│   │                     # BarChart / LineChart / HBarList / ChartTooltip
 │   ├── common/           # 跨页公共组件（表格/筛选/徽章/指标卡/弹窗/Toast…）
 │   ├── clues/            # 核查处置：DisposalForm（7.4 结果回填）
 │   └── rules/            # 规则库：RuleCategoryTree / RuleDetailDrawer
 ├── composables/
-│   └── useResource.ts    # 数据区块四态封装（含竞态保护）
+│   ├── useResource.ts    # 数据区块四态封装（含竞态保护）
+│   └── useTooltip.ts     # 图表悬停浮层状态（定位钳位 / 翻转）
 ├── config/menu.ts        # 唯一菜单数据源（9 一级/34 二级），侧栏与路由共用
 ├── layouts/MainLayout.vue# 侧栏 + 内容区
 ├── router/index.ts       # hash 路由，由 menu.ts 生成，业务页为 MainLayout 子路由
@@ -206,7 +241,8 @@ src/
 │   ├── tokens.css        # 设计令牌唯一来源
 │   ├── tone.css          # 语义语气 → 颜色（.tone-* 类）
 │   └── global.css        # 重置 + 基础样式 + 骨架屏动画
-└── views/                # 7 个业务页 + PlaceholderView
+└── views/                # 业务页
+    └── decision/         # 决策分析 4 页（收入 / 税源 / 治税成效 / 专题）
 ```
 
 ### 3. 取数分层（硬约束）
@@ -254,8 +290,10 @@ VITE_API_BASE_URL=/api      # http 模式下的后端基地址
 页面级/组件级令牌**不写入 `tokens.css`** —— 那里只承载全局设计系统，避免被单页尺寸污染。
 CSS 自定义属性沿 DOM 继承，页内子组件可直接引用上层令牌。
 
-> **例外**：`src/charts/palette.ts` 中保留 hex 字面量。ECharts 只接受真实色值，
-> 无法解析 CSS 变量；该文件是设计稿指定的"图表配色前端令牌"落点，与 `tokens.css` 一一对应。
+> **例外**：`src/charts/palette.ts` 中保留 hex 字面量。ECharts 的 option 与 SVG 的
+> `fill`/`stroke` 属性都只接受真实色值，无法解析 CSS 变量；该文件是"图表 / 图元配色前端令牌"
+> 的唯一落点（`CHART_SERIES`、`DECISION`、`GRAPH_NODE_COLOR` 等），与 `tokens.css` 一一对应。
+> `.vue` 与 `.css` 中仍**零 hex**。
 
 ### 6. 兼容性
 
@@ -271,8 +309,11 @@ CSS 自定义属性沿 DOM 继承，页内子组件可直接引用上层令牌�
 
 | 页面 | 状态 |
 |---|---|
-| 首页驾驶舱 · 一户式主档查询 · 风险线索池 · 核查处置工作台 · 规则配置 · 政策智能问答 · 关联图谱分析 | ✅ 已实现（7 页 / 6 张设计稿全部落地） |
-| 其余 27 个二级菜单 | ⬜ 占位页（暂无设计稿） |
+| 首页驾驶舱 · 一户式主档查询 · 风险线索池 · 核查处置工作台 · 规则配置 · 政策智能问答 · 关联图谱分析 | ✅ 已实现（Design 6 张稿全部落地） |
+| 决策分析：收入分析 · 税源分析 · 治税成效分析 · 专题分析 | ✅ 已实现（`doc/` 交付包 4 张稿全部落地） |
+| 其余 23 个二级菜单 | ⬜ 占位页（暂无设计稿） |
+
+合计 **11 个业务页 / 10 张设计稿**。
 
 ### 公共组件
 
@@ -288,6 +329,10 @@ CSS 自定义属性沿 DOM 继承，页内子组件可直接引用上层令牌�
 | `PageHeader` / `TabNav` / `Pagination` / `SideDrawer` | 页顶栏、标签页、分页、右侧抽屉 |
 | `BaseRadioGroup` | 单选组（核查结论三选一、误报原因七类） |
 | `ConfirmModal` / `Toast` | 二次确认弹窗（派发/提交/退回，《交互说明》4.3）、右上角成功提示 |
+| `PanelCard` | 带标题的分析面板卡（标题 + 副标题 + 右侧操作 + 内容） |
+
+图表复用件（`components/charts/`）：`BarChart` / `LineChart`（ECharts 通用柱/线）、
+`HBarList`（DOM 横向排名条）、`ChartTooltip`（全站统一悬停浮层，配 `useTooltip`）。
 
 领域组件另置：`components/clues/`（`DisposalForm`）、`components/rules/`（`RuleCategoryTree` / `RuleDetailDrawer`）。
 颜色一律经 `styles/tone.css` 的 `.tone-*` 类映射，组件内不出现具体色值。
