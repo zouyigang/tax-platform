@@ -21,6 +21,14 @@ import type {
   DeclineCause,
   DeltaTone,
   DocBlock,
+  DocGenBlock,
+  DocGenOptions,
+  DocGenQuery,
+  DocGenResult,
+  DocGenSegment,
+  DocGenTask,
+  DocGenTaxpayer,
+  DocGenType,
   DocMaterialDetail,
   DocMaterialRow,
   DocMaterialType,
@@ -1787,6 +1795,273 @@ const DOC_MATERIAL_DATA: DocMaterialRow[] = DP_SEED.map((seed, i) => {
   }
 })
 
+/* ==================== 智能应用:文书辅助生成演示数据 ==================== */
+
+/** 文书类型定义 */
+const DG_TEMPLATES: Array<{ value: DocGenType; label: string; desc: string }> = [
+  { value: 'assessment', label: '纳税评估分析报告', desc: '用于评估任务结案,含申报比对与疑点分析' },
+  { value: 'riskTask', label: '风险应对任务说明', desc: '随任务派发下达,说明风险来源与应对要求' },
+  { value: 'inspection', label: '稽查案件情况说明', desc: '用于案件移送与审理,含违法事实与定性依据' },
+  { value: 'interview', label: '约谈提纲', desc: '约谈前准备,列明需纳税人说明的问题' },
+  { value: 'industry', label: '行业税收分析报告', desc: '面向行业整体,含税负对比与趋势研判' },
+]
+
+/** 片段构造快捷函数 */
+const dgT = (text: string): DocGenSegment => ({ type: 'text', text })
+const dgD = (text: string, field: string, source: string): DocGenSegment => ({ type: 'data', text, field, source })
+const dgM = (text: string): DocGenSegment => ({ type: 'model', text })
+
+/** 标题 / 章节 / 正文 / 落款块构造 */
+const dgTitle = (t: string): DocGenBlock => ({ kind: 'title', segments: [dgT(t)], generated: false })
+const dgMeta = (segs: DocGenSegment[]): DocGenBlock => ({ kind: 'meta', segments: segs, generated: false })
+const dgHead = (t: string): DocGenBlock => ({ kind: 'heading', segments: [dgT(t)], generated: false })
+const dgPara = (segs: DocGenSegment[], generated = false): DocGenBlock => ({ kind: 'para', segments: segs, generated })
+const dgSign = (segs: DocGenSegment[]): DocGenBlock => ({ kind: 'sign', segments: segs, generated: false })
+
+/** 期间标签 → 中文表述 */
+const DG_PERIOD_CN: Record<string, string> = {
+  '2026H1': '2026 年 1 月至 6 月',
+  '2025Y': '2025 年度',
+  '2026Q2': '2026 年第二季度',
+}
+
+/**
+ * 生成文书正文
+ * 硬约束:所有数值、名称、日期一律走 data 片段(取自演示数据集),模型只写叙述句。
+ */
+function buildDocGen(query: DocGenQuery): DocGenResult {
+  const tp = SCORE_DATA.filter((s) => s.taxId === query.taxId)[0] || SCORE_DATA[0]
+  const clue = CLUE_DATA.filter((c) => c.id === query.taskId)[0]
+  const tmpl = DG_TEMPLATES.filter((t) => t.value === query.docType)[0] || DG_TEMPLATES[0]
+  const periodCn = DG_PERIOD_CN[query.period] || DG_PERIOD_CN['2026H1']
+  const detailed = query.detail === 'full'
+  const brief = query.detail === 'brief'
+
+  // 数值全部来自既有数据集,不由模型编造
+  const sales = (1860 + tp.score * 12).toFixed(2)
+  const tax = (sales === '' ? 0 : +sales * 0.031).toFixed(2)
+  const burden = (3.1 - (tp.score - 60) * 0.012).toFixed(2)
+  const industryBurden = '3.28'
+  const invoiceAmt = (+sales * 1.18).toFixed(2)
+  const gap = (+invoiceAmt - +sales).toFixed(2)
+  const estTax = clue ? clue.estimatedTax.toFixed(2) : (tp.score * 1.6).toFixed(2)
+
+  const SRC_DECLARE = '增值税纳税申报表主表(征管系统)'
+  const SRC_INVOICE = '增值税发票管理系统 · 开票明细'
+  const SRC_REG = '税务登记信息(征管系统)'
+  const SRC_BENCH = '行业税负基准库 2026Q2'
+  const SRC_CLUE = '风险线索池 · 线索详情'
+
+  const blocks: DocGenBlock[] = []
+  const docNo = `${tp.district.slice(0, 2)}税${query.docType === 'inspection' ? '稽' : '评'}〔2026〕${100 + Math.round(tp.score)}号`
+
+  blocks.push(dgTitle(query.docType === 'industry' ? `${tp.industry}行业税收分析报告` : `${tp.taxpayerName}${tmpl.label}`))
+  blocks.push(
+    dgMeta([
+      dgT('文号:'),
+      dgD(docNo, '文号', '文书编号规则(系统自动生成)'),
+      dgT('        分析期间:'),
+      dgD(periodCn, '分析期间', '用户所选参数'),
+    ]),
+  )
+
+  /* ---- 一、基本情况:各文种通用,全部字段直填 ---- */
+  blocks.push(dgHead('一、基本情况'))
+  blocks.push(
+    dgPara([
+      dgT('纳税人名称:'),
+      dgD(tp.taxpayerName, '纳税人名称', SRC_REG),
+      dgT(',纳税人识别号:'),
+      dgD(tp.taxId, '纳税人识别号', SRC_REG),
+      dgT(',所属行业:'),
+      dgD(tp.industry, '所属行业', SRC_REG),
+      dgT(',主管税务机关:'),
+      dgD(`${tp.district}税务局`, '主管税务机关', SRC_REG),
+      dgT('。'),
+    ]),
+  )
+
+  if (query.docType === 'interview') {
+    /* ---- 约谈提纲:事由 + 要点清单 + 需说明问题 ---- */
+    blocks.push(dgHead('二、约谈事由'))
+    blocks.push(
+      dgPara([
+        dgT('该户'),
+        dgD(periodCn, '分析期间', '用户所选参数'),
+        dgT('申报销售额'),
+        dgD(`${sales} 万元`, '申报销售额', SRC_DECLARE),
+        dgT(',同期开票金额'),
+        dgD(`${invoiceAmt} 万元`, '开票金额', SRC_INVOICE),
+        dgT(',两者差额'),
+        dgD(`${gap} 万元`, '申报开票差额', '申报表与发票数据比对'),
+        dgT('。'),
+      ]),
+    )
+    blocks.push(
+      dgPara(
+        [dgM('鉴于上述差额较大且持续多期存在,拟约谈该户财务负责人,当面核实其收入确认口径与开票管理情况,听取其解释说明。')],
+        true,
+      ),
+    )
+    blocks.push(dgHead('三、需说明的问题'))
+    blocks.push(
+      dgPara(
+        [dgM('1. 申报销售额与开票金额存在差额的具体原因,是否存在预收账款、跨期开票或折扣折让等情形;')],
+        true,
+      ),
+    )
+    blocks.push(dgPara([dgM('2. 收入确认的会计政策与纳税义务发生时间的对应关系,相关合同与结算凭证能否提供;')], true))
+    blocks.push(dgPara([dgM('3. 是否存在未开票收入未按规定申报的情形,如有,拟采取何种更正措施与时限安排。')], true))
+  } else if (query.docType === 'industry') {
+    /* ---- 行业税收分析报告:概况 + 税负对比 + 趋势 ---- */
+    blocks.push(dgHead('二、行业税收贡献'))
+    blocks.push(
+      dgPara([
+        dgT('本期'),
+        dgD(tp.industry, '行业', SRC_REG),
+        dgT('行业中位税负率为'),
+        dgD(`${industryBurden}%`, '行业中位税负率', SRC_BENCH),
+        dgT(',四分位区间为'),
+        dgD('2.41% ~ 4.06%', '行业 Q1–Q3 区间', SRC_BENCH),
+        dgT(',入样企业'),
+        dgD('68 户', '入样企业数', SRC_BENCH),
+        dgT('。'),
+      ]),
+    )
+    blocks.push(
+      dgPara(
+        [dgM('从分布形态看,该行业税负率整体呈右偏,少数企业显著低于四分位下限,构成本期风险扫描的重点关注对象。')],
+        true,
+      ),
+    )
+    blocks.push(dgHead('三、趋势研判'))
+    blocks.push(
+      dgPara(
+        [dgM('结合上下游景气度与本地产业政策,预计下一期该行业税负水平将保持平稳,建议将基准值按季度滚动更新后再行比对。')],
+        true,
+      ),
+    )
+  } else {
+    /* ---- 评估 / 风险应对 / 稽查:申报情况 + 风险点 + 发现 ---- */
+    blocks.push(dgHead('二、申报及入库情况'))
+    blocks.push(
+      dgPara([
+        dgD(periodCn, '分析期间', '用户所选参数'),
+        dgT(',该户累计申报销售额'),
+        dgD(`${sales} 万元`, '申报销售额', SRC_DECLARE),
+        dgT(',应纳增值税'),
+        dgD(`${tax} 万元`, '应纳税额', SRC_DECLARE),
+        dgT(',实际税负率'),
+        dgD(`${burden}%`, '实际税负率', SRC_DECLARE),
+        dgT(',同行业中位税负率'),
+        dgD(`${industryBurden}%`, '行业中位税负率', SRC_BENCH),
+        dgT('。'),
+      ]),
+    )
+    if (query.withTable) {
+      blocks.push(
+        dgPara([
+          dgT('主要指标对照:申报销售额 '),
+          dgD(`${sales} 万元`, '申报销售额', SRC_DECLARE),
+          dgT(' / 开票金额 '),
+          dgD(`${invoiceAmt} 万元`, '开票金额', SRC_INVOICE),
+          dgT(' / 差额 '),
+          dgD(`${gap} 万元`, '申报开票差额', '申报表与发票数据比对'),
+          dgT(' / 预估应补税款 '),
+          dgD(`${estTax} 万元`, '预估应补税款', clue ? SRC_CLUE : '按差额与适用税率测算'),
+          dgT('。'),
+        ]),
+      )
+    }
+
+    blocks.push(dgHead('三、风险点分析'))
+    if (clue) {
+      blocks.push(
+        dgPara([
+          dgT('本次分析关联风险线索'),
+          dgD(clue.id, '关联线索编号', SRC_CLUE),
+          dgT(',线索生成日期'),
+          dgD(clue.createdDate, '线索生成日期', SRC_CLUE),
+          dgT(',命中规则'),
+          dgD(`${clue.hitRuleCount} 条`, '命中规则数', SRC_CLUE),
+          dgT(',风险等级'),
+          dgD(RISK_CN[clue.riskLevel], '风险等级', SRC_CLUE),
+          dgT('。'),
+        ]),
+      )
+    }
+    blocks.push(
+      dgPara(
+        [
+          dgM(
+            '经比对,该户申报销售额与同期开票金额存在持续性差额,且实际税负率低于同行业中位水平,不排除存在收入确认不及时或未开票收入未申报的情形。' +
+              (detailed
+                ? '从时序上看,差额自本期第二个月起逐月扩大,与该户同期用电量、社保参保人数的平稳走势不相匹配,提示差额并非由经营规模收缩所致。'
+                : ''),
+          ),
+        ],
+        true,
+      ),
+    )
+
+    if (!brief) {
+      blocks.push(dgHead('四、核查发现'))
+      blocks.push(
+        dgPara(
+          [
+            dgM(
+              '经调取该户账簿凭证及银行流水核对,其部分销售业务在货物发出并收讫价款后未及时确认收入,相关款项计入往来科目挂账。' +
+                (detailed ? '上述处理导致当期销项税额少计,与增值税纳税义务发生时间的规定不符。' : ''),
+            ),
+          ],
+          true,
+        ),
+      )
+    }
+
+    if (query.withAdvice) {
+      blocks.push(dgHead(brief ? '四、处理建议' : '五、处理建议'))
+      blocks.push(
+        dgPara(
+          [
+            dgM(
+              query.docType === 'inspection'
+                ? '建议按《税收征收管理法》相关规定,责令该户限期改正并补缴税款、加收滞纳金;情节需进一步认定的,移送审理环节处理。'
+                : query.docType === 'riskTask'
+                  ? '建议将该户列入本期风险应对名单,由主管税务所在规定时限内完成核实,并将核查结论与证据材料回填至风险任务系统。'
+                  : '建议约谈该户财务负责人,要求其对差额情况作出说明并提供相关合同、结算凭证;经核实确属少计收入的,督促其自查补缴。',
+            ),
+          ],
+          true,
+        ),
+      )
+      blocks.push(
+        dgPara([
+          dgT('预估应补税款:'),
+          dgD(`${estTax} 万元`, '预估应补税款', clue ? SRC_CLUE : '按差额与适用税率测算'),
+          dgT('(最终金额以核实结论为准)。'),
+        ]),
+      )
+    }
+  }
+
+  blocks.push(dgSign([dgD(`${tp.district}税务局`, '制发机关', SRC_REG)]))
+  blocks.push(dgSign([dgD('2026 年 7 月 24 日', '制发日期', '系统生成日期')]))
+
+  const dataFieldCount = blocks.reduce((s, b) => s + b.segments.filter((g) => g.type === 'data').length, 0)
+  const modelBlockCount = blocks.filter((b) => b.generated).length
+
+  return {
+    title: blocks[0].segments[0].text,
+    docNo,
+    generatedAt: '2026-07-24 08:52',
+    modelVersion: '税务文书生成模型 v1.6(政务内网私有化部署)',
+    dataFieldCount,
+    modelBlockCount,
+    blocks,
+  }
+}
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -3364,6 +3639,59 @@ export const mockClient: ApiClient = {
 
     getDocMaterialDetail(id: string): Promise<DocMaterialDetail> {
       return delay(buildDocDetail(id))
+    },
+
+    getDocGenOptions(): Promise<DocGenOptions> {
+      return delay({
+        updatedAt: '2026-07-24 08:00',
+        modelVersion: '税务文书生成模型 v1.6(政务内网私有化部署)',
+        templates: DG_TEMPLATES.map((t) => ({ value: t.value, label: t.label, desc: t.desc })),
+        periods: [
+          { value: '2026H1', label: '2026 年 1—6 月' },
+          { value: '2026Q2', label: '2026 年第二季度' },
+          { value: '2025Y', label: '2025 年度' },
+        ],
+        detailLevels: [
+          { value: 'brief', label: '简要' },
+          { value: 'standard', label: '标准' },
+          { value: 'full', label: '详尽' },
+        ],
+      })
+    },
+
+    searchDocGenTaxpayers(keyword: string): Promise<DocGenTaxpayer[]> {
+      const kw = keyword.trim()
+      const hit = SCORE_DATA.filter((s) => {
+        if (!kw) return true
+        return s.taxpayerName.indexOf(kw) >= 0 || s.taxId.toUpperCase().indexOf(kw.toUpperCase()) >= 0
+      })
+      return delay(
+        hit.slice(0, 12).map((s) => ({
+          taxId: s.taxId,
+          name: s.taxpayerName,
+          industry: s.industry,
+          district: s.district,
+        })),
+      )
+    },
+
+    getDocGenTasks(taxId: string): Promise<DocGenTask[]> {
+      const tp = SCORE_DATA.filter((s) => s.taxId === taxId)[0]
+      // 线索池与评分样本共用纳税人名称,按名称回关联该户的线索
+      const tasks = tp
+        ? CLUE_DATA.filter((c) => c.taxpayerName === tp.taxpayerName).map((c) => ({
+            id: c.id,
+            label: `${CAT_LABEL[c.categoryCode] || c.categoryCode}·命中 ${c.hitRuleCount} 条规则`,
+            riskLevel: c.riskLevel,
+            createdAt: c.createdDate,
+          }))
+        : []
+      return delay(tasks)
+    },
+
+    generateDoc(query: DocGenQuery): Promise<DocGenResult> {
+      // 生成过程比普通取数慢,延时给足以呈现"正在生成"
+      return delay(buildDocGen(query), 900)
     },
   },
 

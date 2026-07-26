@@ -3223,6 +3223,120 @@ export interface DocProcessFilters {
   statuses: Array<FilterOption & { count: number }>
 }
 
+/* ------------------------------------------------------------------------
+ * 智能应用 · 文书辅助生成(《需求文档》5.3)
+ * 形态是「参数表单 + 文档编辑器」,不是对话。
+ * 硬约束:**严禁模型生成任何数值** —— 因此正文被拆成片段(segment),
+ * 凡涉及数字、名称、日期的一律是 data 片段,取自征管数据并锁定不可编辑,
+ * 悬停可查其数据来源;模型只负责生成叙述性段落,那些段落可自由编辑。
+ * 这个「谁写的、能不能改」的区分必须由接口下发,前端不能自行猜测。
+ * ---------------------------------------------------------------------- */
+
+/** 文书类型 */
+export type DocGenType = 'assessment' | 'riskTask' | 'inspection' | 'interview' | 'industry'
+
+/** 正文片段:模板固定文字 / 数据直填字段 / 模型生成文字 */
+export type DocGenSegmentType = 'text' | 'data' | 'model'
+
+/** 正文片段 */
+export interface DocGenSegment {
+  /** 片段类型 */
+  type: DocGenSegmentType
+  /** 片段文字 */
+  text: string
+  /** data 片段:字段名 */
+  field?: string
+  /** data 片段:数据来源(悬停展示) */
+  source?: string
+}
+
+/** 文档块 */
+export interface DocGenBlock {
+  /** 块类型:标题 / 文号 / 章节标题 / 正文段 / 落款 */
+  kind: 'title' | 'meta' | 'heading' | 'para' | 'sign'
+  /** 组成该块的片段 */
+  segments: DocGenSegment[]
+  /**
+   * 是否为模型生成段落(可自由编辑,带生成标记);
+   * false 表示模板固定块,其中的 data 片段同样锁定。
+   */
+  generated: boolean
+}
+
+/** 可选纳税人(参数面板搜索用) */
+export interface DocGenTaxpayer {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  name: string
+  /** 所属行业 */
+  industry: string
+  /** 所属区县 */
+  district: string
+}
+
+/** 可关联的风险任务 */
+export interface DocGenTask {
+  /** 任务 / 线索编号 */
+  id: string
+  /** 任务描述 */
+  label: string
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 生成日期 */
+  createdAt: string
+}
+
+/** 文书生成·参数选项 */
+export interface DocGenOptions {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 模型版本 */
+  modelVersion: string
+  /** 文书类型选项 */
+  templates: Array<FilterOption & { desc: string }>
+  /** 分析期间选项 */
+  periods: FilterOption[]
+  /** 详略程度选项 */
+  detailLevels: FilterOption[]
+}
+
+/** 文书生成·请求参数 */
+export interface DocGenQuery {
+  /** 文书类型 */
+  docType: string
+  /** 关联纳税人识别号 */
+  taxId: string
+  /** 关联风险任务编号;空表示不关联 */
+  taskId: string
+  /** 分析期间 */
+  period: string
+  /** 详略程度 */
+  detail: string
+  /** 是否附数据附表 */
+  withTable: boolean
+  /** 是否包含处理建议 */
+  withAdvice: boolean
+}
+
+/** 文书生成结果 */
+export interface DocGenResult {
+  /** 文书标题 */
+  title: string
+  /** 文号 */
+  docNo: string
+  /** 生成时间 */
+  generatedAt: string
+  /** 使用的模型版本 */
+  modelVersion: string
+  /** 数据直填字段数(全部取自征管数据) */
+  dataFieldCount: number
+  /** 模型生成段落数 */
+  modelBlockCount: number
+  /** 正文块 */
+  blocks: DocGenBlock[]
+}
+
 /** 智能应用接口分组 */
 export interface AppApi {
   /** 资料处理·队列筛选项 */
@@ -3231,6 +3345,14 @@ export interface AppApi {
   getDocMaterials(query: DocProcessQuery): Promise<DocMaterialRow[]>
   /** 资料处理·单份材料的抽取结果 */
   getDocMaterialDetail(id: string): Promise<DocMaterialDetail>
+  /** 文书生成·参数选项 */
+  getDocGenOptions(): Promise<DocGenOptions>
+  /** 文书生成·按关键字搜索纳税人 */
+  searchDocGenTaxpayers(keyword: string): Promise<DocGenTaxpayer[]>
+  /** 文书生成·某纳税人可关联的风险任务 */
+  getDocGenTasks(taxId: string): Promise<DocGenTask[]>
+  /** 文书生成·生成正文 */
+  generateDoc(query: DocGenQuery): Promise<DocGenResult>
 }
 
 /* ========================================================================

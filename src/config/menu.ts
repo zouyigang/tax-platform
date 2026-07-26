@@ -236,12 +236,7 @@ export const MENU: MenuEntry[] = [
         key: 'app-doc-gen',
         title: '文书辅助生成',
         path: '/app/doc-gen',
-        status: 'placeholder',
-        desc: [
-          '按模板与案情要素辅助生成核查通知、认定说明等税务文书。',
-          '支持要素回填、合规校验与一键成文。',
-          '对应需求 5.3 文书辅助生成。',
-        ],
+        status: 'done',
       },
       {
         key: 'app-doc-process',

@@ -34,6 +34,11 @@ import type {
   DispatchFilters,
   DispatchQuery,
   DispatchRow,
+  DocGenOptions,
+  DocGenQuery,
+  DocGenResult,
+  DocGenTask,
+  DocGenTaxpayer,
   DocMaterialDetail,
   DocMaterialRow,
   DocProcessFilters,
@@ -250,6 +255,26 @@ export const httpClient: ApiClient = {
     },
     getDocMaterialDetail(id: string): Promise<DocMaterialDetail> {
       return get<DocMaterialDetail>(`/app/doc-process/materials/${encodeURIComponent(id)}`)
+    },
+    getDocGenOptions(): Promise<DocGenOptions> {
+      return get<DocGenOptions>('/app/doc-gen/options')
+    },
+    searchDocGenTaxpayers(keyword: string): Promise<DocGenTaxpayer[]> {
+      return get<DocGenTaxpayer[]>('/app/doc-gen/taxpayers', { keyword })
+    },
+    getDocGenTasks(taxId: string): Promise<DocGenTask[]> {
+      return get<DocGenTask[]>('/app/doc-gen/tasks', { taxId })
+    },
+    generateDoc(query: DocGenQuery): Promise<DocGenResult> {
+      return get<DocGenResult>('/app/doc-gen/generate', {
+        docType: query.docType,
+        taxId: query.taxId,
+        taskId: query.taskId,
+        period: query.period,
+        detail: query.detail,
+        withTable: query.withTable ? 1 : 0,
+        withAdvice: query.withAdvice ? 1 : 0,
+      })
     },
   },
 
