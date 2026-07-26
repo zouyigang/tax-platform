@@ -2167,6 +2167,127 @@ export interface ScoreAttribution {
   suggestion: string
 }
 
+/* ------------------------------------------------------------------------
+ * 智能模型 · 虚开团伙识别(《需求文档》3.7 / 4.3.2)
+ * 与风险评分模型的区别:评分模型的单位是「户」,本模型的单位是「团伙」,
+ * 判定依据不是单户特征而是群体拓扑结构(环状 / 星状 / 链状)与群体行为证据。
+ * 因此归因形态也不同:评分模型给 SHAP 贡献值,本模型给「认定依据」证据清单。
+ * ---------------------------------------------------------------------- */
+
+/** 团伙结构模式:环状(闭环互开)/ 星状(一票多流)/ 链状(层层过票) */
+export type GangPattern = 'ring' | 'star' | 'chain'
+
+/** 团伙核查状态 */
+export type GangStatus = 'new' | 'checking' | 'confirmed' | 'excluded'
+
+/** 团伙列表行 */
+export interface GangRow {
+  /** 团伙编号 */
+  id: string
+  /** 结构模式 */
+  pattern: GangPattern
+  /** 成员数(户) */
+  memberCount: number
+  /** 涉票金额(万元) */
+  invoiceAmount: number
+  /** 核心节点名称 */
+  coreName: string
+  /** 核心节点所在区县 */
+  district: string
+  /** 可疑度评分(0–100) */
+  suspicion: number
+  /** 可疑度等级(由评分分档) */
+  level: RiskLevel
+  /** 识别时间 */
+  discoveredAt: string
+  /** 核查状态 */
+  status: GangStatus
+}
+
+/** 团伙列表·查询参数 */
+export interface GangQuery {
+  /** 团伙编号 / 核心节点名称关键字 */
+  keyword: string
+  /** 区县编码;'all' 不限 */
+  districtCode: string
+  /** 结构模式多选;空数组不限 */
+  patterns: GangPattern[]
+  /** 排序字段(suspicion / memberCount / invoiceAmount) */
+  sortKey: string
+  /** 排序方向:1 升序 / -1 降序 */
+  sortDir: 1 | -1
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 团伙列表·筛选项与概览 */
+export interface GangFilters {
+  /** 识别批次时间 */
+  updatedAt: string
+  /** 结构模式选项(附计数) */
+  patterns: Array<FilterOption & { count: number }>
+  /** 区县选项(含「全部区县」) */
+  districts: FilterOption[]
+  /** 概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 团伙成员 */
+export interface GangMember {
+  /** 对应子图节点 id(点击可在画布中选中) */
+  nodeId: string
+  /** 纳税人名称 */
+  name: string
+  /** 在团伙中的角色(开票方 / 受票方 / 过账中间户 / 实际控制人) */
+  role: string
+  /** 纳税人识别号 */
+  taxId: string
+  /** 该成员风险分(与风险评分模型同一口径) */
+  score: number
+  /** 风险等级 */
+  level: RiskLevel
+  /** 该成员涉票金额(万元) */
+  invoiceAmount: number
+  /** 行为说明 */
+  note: string
+}
+
+/** 团伙认定依据(归因:说明可疑度分从何而来) */
+export interface GangEvidence {
+  /** 证据项名称 */
+  name: string
+  /** 实测表现 */
+  detail: string
+  /** 对可疑度评分的贡献(分) */
+  weight: number
+  /** 是否命中(未命中项也展示,便于人工判断结论是否可靠) */
+  hit: boolean
+}
+
+/** 团伙下钻详情 */
+export interface GangDetail {
+  /** 团伙编号 */
+  id: string
+  /** 结构模式 */
+  pattern: GangPattern
+  /** 可疑度评分 */
+  suspicion: number
+  /** 一句话结论 */
+  summary: string
+  /** 子图节点(复用关联图谱的节点结构与画布坐标系) */
+  nodes: GraphNode[]
+  /** 子图连线 */
+  edges: GraphEdge[]
+  /** 默认选中的节点 id(核心节点) */
+  coreId: string
+  /** 成员清单(按风险分降序) */
+  members: GangMember[]
+  /** 认定依据 */
+  evidences: GangEvidence[]
+}
+
 /** 智能模型接口分组 */
 export interface ModelApi {
   /** 风险评分模型·模型态(版本 / Lift / 特征重要性) */
@@ -2177,6 +2298,12 @@ export interface ModelApi {
   getScores(query: ScoreQuery): Promise<PagedResult<ScoreRow>>
   /** 风险评分归因·单户 SHAP 明细 */
   getScoreAttribution(taxId: string): Promise<ScoreAttribution>
+  /** 虚开团伙·筛选项与概览 */
+  getGangFilters(): Promise<GangFilters>
+  /** 虚开团伙·列表(服务端排序 + 分页) */
+  getGangs(query: GangQuery): Promise<PagedResult<GangRow>>
+  /** 虚开团伙·下钻详情(子图 + 成员 + 认定依据) */
+  getGangDetail(id: string): Promise<GangDetail>
 }
 
 /* ========================================================================

@@ -44,6 +44,16 @@ import type {
   EntityMatchFilters,
   EntityMatchQuery,
   EntityMatchRow,
+  GangDetail,
+  GangEvidence,
+  GangFilters,
+  GangMember,
+  GangPattern,
+  GangQuery,
+  GangRow,
+  GangStatus,
+  GraphEdge,
+  GraphNode,
   MatchStatus,
   QualityDashboard,
   EffectivenessAnalysis,
@@ -488,6 +498,201 @@ function buildAttribution(row: ScoreRow): ScoreAttribution {
           : '当前分值处于正常区间,暂不建议派发核查任务。',
   }
 }
+
+/* ==================== 智能模型:虚开团伙演示数据 ==================== */
+
+/** 团伙演示种子(结构模式 / 成员数 / 可疑度 / 核查状态) */
+const GANG_SEED: Array<{
+  pattern: GangPattern
+  members: number
+  suspicion: number
+  status: GangStatus
+  discoveredAt: string
+}> = [
+  { pattern: 'ring', members: 6, suspicion: 94.2, status: 'checking', discoveredAt: '2026-07-22' },
+  { pattern: 'star', members: 8, suspicion: 91.6, status: 'new', discoveredAt: '2026-07-21' },
+  { pattern: 'chain', members: 7, suspicion: 88.4, status: 'confirmed', discoveredAt: '2026-07-19' },
+  { pattern: 'ring', members: 5, suspicion: 86.1, status: 'checking', discoveredAt: '2026-07-18' },
+  { pattern: 'star', members: 6, suspicion: 82.7, status: 'new', discoveredAt: '2026-07-17' },
+  { pattern: 'chain', members: 6, suspicion: 78.3, status: 'checking', discoveredAt: '2026-07-15' },
+  { pattern: 'star', members: 7, suspicion: 74.9, status: 'new', discoveredAt: '2026-07-14' },
+  { pattern: 'chain', members: 5, suspicion: 71.2, status: 'confirmed', discoveredAt: '2026-07-12' },
+  { pattern: 'ring', members: 5, suspicion: 68.5, status: 'checking', discoveredAt: '2026-07-11' },
+  { pattern: 'star', members: 6, suspicion: 64.8, status: 'new', discoveredAt: '2026-07-09' },
+  { pattern: 'chain', members: 5, suspicion: 61.3, status: 'excluded', discoveredAt: '2026-07-08' },
+  { pattern: 'star', members: 5, suspicion: 57.6, status: 'excluded', discoveredAt: '2026-07-05' },
+]
+
+/** 团伙成员取自评分样本集,保证「团伙成员」在风险评分模型里查得到同一个分值 */
+function gangMembers(gi: number, count: number) {
+  const picked: ScoreRow[] = []
+  for (let k = 0; k < count; k++) picked.push(SCORE_DATA[(gi * 3 + k * 5) % SCORE_DATA.length])
+  return picked
+}
+
+/** 成员在团伙中的角色(按结构模式与位置推定) */
+function gangRole(pattern: GangPattern, i: number, count: number): string {
+  if (pattern === 'star') return i === 0 ? '核心开票方' : '受票方'
+  if (pattern === 'chain') return i === 0 ? '上游开票方' : i === count - 1 ? '终端受票方' : '过账中间户'
+  return i === 0 ? '核心开票方' : i === count - 1 ? '受票方' : '过账中间户'
+}
+
+/** 子图坐标布局(760×420 视图坐标系;三种结构模式各自成形) */
+function gangLayout(pattern: GangPattern, count: number): Array<{ x: number; y: number }> {
+  const pts: Array<{ x: number; y: number }> = []
+  if (pattern === 'chain') {
+    for (let i = 0; i < count; i++) {
+      pts.push({ x: Math.round(95 + (i * 570) / (count - 1)), y: i % 2 === 0 ? 120 : 275 })
+    }
+    return pts
+  }
+  if (pattern === 'star') {
+    pts.push({ x: 380, y: 195 })
+    for (let i = 1; i < count; i++) {
+      const a = (-90 + ((i - 1) * 360) / (count - 1)) * (Math.PI / 180)
+      pts.push({ x: Math.round(380 + 255 * Math.cos(a)), y: Math.round(195 + 135 * Math.sin(a)) })
+    }
+    return pts
+  }
+  for (let i = 0; i < count; i++) {
+    const a = (-90 + (i * 360) / count) * (Math.PI / 180)
+    pts.push({ x: Math.round(380 + 250 * Math.cos(a)), y: Math.round(185 + 125 * Math.sin(a)) })
+  }
+  return pts
+}
+
+/** 由团伙构造子图(成员节点 + 实际控制人;环状另加资金回流账户) */
+function buildGangGraph(pattern: GangPattern, members: ScoreRow[]) {
+  const pts = gangLayout(pattern, members.length)
+  const nodes: GraphNode[] = members.map((m, i) => ({
+    id: `m${i}`,
+    label: m.taxpayerName,
+    type: gangRole(pattern, i, members.length) === '受票方' || gangRole(pattern, i, members.length) === '终端受票方' ? 'invoice' : 'ent',
+    x: pts[i].x,
+    y: pts[i].y,
+    risk: m.level,
+    core: i === 0,
+  }))
+  const edges: GraphEdge[] = []
+  if (pattern === 'star') {
+    for (let i = 1; i < members.length; i++) {
+      edges.push({ source: 'm0', target: `m${i}`, label: '开票', strong: true })
+    }
+  } else if (pattern === 'chain') {
+    for (let i = 0; i < members.length - 1; i++) {
+      edges.push({ source: `m${i}`, target: `m${i + 1}`, label: '开票', strong: true })
+    }
+  } else {
+    for (let i = 0; i < members.length; i++) {
+      edges.push({ source: `m${i}`, target: `m${(i + 1) % members.length}`, label: '开票', strong: true })
+    }
+  }
+
+  // 实际控制人:团伙的人身连接点,虚开团伙的关键识别线索
+  const personPos = pattern === 'ring' ? { x: 380, y: 185 } : { x: 380, y: 372 }
+  nodes.push({ id: 'p0', label: '张××(实际控制人)', type: 'person', x: personPos.x, y: personPos.y, risk: null, core: false })
+  edges.push({ source: 'p0', target: 'm0', label: '法定代表人', strong: false })
+  if (members.length > 2) edges.push({ source: 'p0', target: 'm2', label: '实际控制', strong: false })
+
+  // 环状结构补一个资金账户,呈现「开票闭环 + 资金回流」
+  if (pattern === 'ring') {
+    nodes.push({ id: 'f0', label: '个人账户 尾号 4712', type: 'fund', x: 690, y: 352, risk: null, core: false })
+    edges.push({ source: `m${members.length - 1}`, target: 'f0', label: '资金流出', strong: false })
+    edges.push({ source: 'f0', target: 'm0', label: '资金回流', strong: false })
+  }
+  return { nodes, edges }
+}
+
+/** 认定依据基础项(权重按命中情况归一到可疑度评分) */
+const GANG_EVIDENCE_BASE: Array<{ name: string; weight: number }> = [
+  { name: '发票流向构成闭环', weight: 22 },
+  { name: '法定代表人交叉任职', weight: 18 },
+  { name: '开票时间高度集中', weight: 16 },
+  { name: '注册地址聚集', weight: 14 },
+  { name: '无实际经营能力', weight: 12 },
+  { name: '短期大额开票后失联', weight: 10 },
+]
+
+/** 由团伙行构造下钻详情 */
+function buildGangDetail(gi: number): GangDetail {
+  const seed = GANG_SEED[gi]
+  const rows = gangMembers(gi, seed.members)
+  const graph = buildGangGraph(seed.pattern, rows)
+  const patternCn = seed.pattern === 'ring' ? '环状' : seed.pattern === 'star' ? '星状' : '链状'
+
+  const members: GangMember[] = rows.map((r, i) => {
+    const role = gangRole(seed.pattern, i, rows.length)
+    return {
+      nodeId: `m${i}`,
+      name: r.taxpayerName,
+      role,
+      taxId: r.taxId,
+      score: r.score,
+      level: r.level,
+      invoiceAmount: +(320 + ((gi * 37 + i * 53) % 480) + r.score * 3.2).toFixed(1),
+      note:
+        role === '过账中间户'
+          ? '进项销项当月进当月出,毛利率近乎为零'
+          : role === '核心开票方' || role === '上游开票方'
+            ? '开票量远超经营规模,进项主要来自同一批企业'
+            : '取得发票后未见对应货物运输与资金支付记录',
+    }
+  })
+
+  // 命中项:环状必然命中闭环;其余按可疑度高低递减命中
+  const hits = GANG_EVIDENCE_BASE.map((e, i) => {
+    if (i === 0) return seed.pattern === 'ring'
+    return seed.suspicion >= 90 - i * 6
+  })
+  const hitSum = GANG_EVIDENCE_BASE.reduce((s, e, i) => (hits[i] ? s + e.weight : s), 0) || 1
+  const scale = seed.suspicion / hitSum
+  const details = [
+    seed.pattern === 'ring'
+      ? `${rows.length} 户企业开票流向首尾相接,并有资金回流至个人账户`
+      : `未发现闭环开票,发票呈${patternCn}单向流转`,
+    `${rows.length} 户企业中 ${Math.min(rows.length, 3)} 户法定代表人为同一人或近亲属`,
+    `近 3 个月开票集中在 ${6 + (gi % 5)} 个工作日内完成,占全部开票量 ${(72 + (gi % 9)).toFixed(0)}%`,
+    `${Math.max(2, rows.length - 2)} 户注册地址位于同一楼宇同一层`,
+    `成员企业社保参保 0 人、无固定经营场所租赁合同`,
+    `开票后 ${30 + (gi % 40)} 日内申报状态转为非正常`,
+  ]
+  const evidences: GangEvidence[] = GANG_EVIDENCE_BASE.map((e, i) => ({
+    name: e.name,
+    detail: details[i],
+    weight: hits[i] ? +(e.weight * scale).toFixed(1) : 0,
+    hit: hits[i],
+  }))
+
+  return {
+    id: `XK2026-${(2100 + gi).toString()}`,
+    pattern: seed.pattern,
+    suspicion: seed.suspicion,
+    summary: `该团伙呈${patternCn}结构,共 ${rows.length} 户成员,核心节点为「${rows[0].taxpayerName}」,涉票金额 ${members.reduce((s, m) => s + m.invoiceAmount, 0).toFixed(1)} 万元。`,
+    nodes: graph.nodes,
+    edges: graph.edges,
+    coreId: 'm0',
+    members: members.slice().sort((a, b) => b.score - a.score),
+    evidences,
+  }
+}
+
+/** 团伙列表数据(由种子与评分样本推导,保证与下钻详情一致) */
+const GANG_DATA: GangRow[] = GANG_SEED.map((seed, gi) => {
+  const rows = gangMembers(gi, seed.members)
+  const detail = buildGangDetail(gi)
+  return {
+    id: detail.id,
+    pattern: seed.pattern,
+    memberCount: seed.members,
+    invoiceAmount: +detail.members.reduce((s, m) => s + m.invoiceAmount, 0).toFixed(1),
+    coreName: rows[0].taxpayerName,
+    district: rows[0].district,
+    suspicion: seed.suspicion,
+    level: seed.suspicion >= 85 ? 'high' : seed.suspicion >= 70 ? 'mid' : 'low',
+    discoveredAt: seed.discoveredAt,
+    status: seed.status,
+  }
+})
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
@@ -1619,6 +1824,60 @@ export const mockClient: ApiClient = {
     getScoreAttribution(taxId: string): Promise<ScoreAttribution> {
       const row = SCORE_DATA.filter((r) => r.taxId === taxId)[0] || SCORE_DATA[0]
       return delay(buildAttribution(row))
+    },
+
+    getGangFilters(): Promise<GangFilters> {
+      const count = (p: GangPattern) => GANG_DATA.filter((g) => g.pattern === p).length
+      const totalAmount = GANG_DATA.reduce((s, g) => s + g.invoiceAmount, 0)
+      const totalMembers = GANG_DATA.reduce((s, g) => s + g.memberCount, 0)
+      return delay({
+        updatedAt: '2026-07-24 04:10',
+        patterns: [
+          { value: 'ring', label: '环状 · 闭环互开', count: count('ring') },
+          { value: 'star', label: '星状 · 一票多流', count: count('star') },
+          { value: 'chain', label: '链状 · 层层过票', count: count('chain') },
+        ],
+        districts: [{ value: 'all', label: '全部区县' }].concat(
+          Object.keys(DISTRICT_CN).map((code) => ({ value: code, label: DISTRICT_CN[code] })),
+        ),
+        kpis: [
+          { label: '识别团伙', value: String(GANG_DATA.length), unit: '个', accent: 'primary' },
+          { label: '涉及企业', value: String(totalMembers), unit: '户', accent: 'teal' },
+          { label: '涉票金额', value: (totalAmount / 10000).toFixed(2), unit: '亿元', accent: 'red' },
+          { label: '高可疑团伙', value: String(GANG_DATA.filter((g) => g.level === 'high').length), unit: '个', accent: 'gold' },
+        ],
+      })
+    },
+
+    getGangs(query: GangQuery): Promise<PagedResult<GangRow>> {
+      const kw = query.keyword.trim()
+      const filtered = GANG_DATA.filter((g) => {
+        if (kw && g.id.toUpperCase().indexOf(kw.toUpperCase()) < 0 && g.coreName.indexOf(kw) < 0) return false
+        if (query.districtCode !== 'all' && DISTRICT_CODE_BY_CN[g.district] !== query.districtCode) return false
+        if (query.patterns.length && query.patterns.indexOf(g.pattern) < 0) return false
+        return true
+      })
+      const dir = query.sortDir
+      const sorted = filtered.slice().sort((a, b) => {
+        if (query.sortKey === 'memberCount') return (a.memberCount - b.memberCount) * dir
+        if (query.sortKey === 'invoiceAmount') return (a.invoiceAmount - b.invoiceAmount) * dir
+        return (a.suspicion - b.suspicion) * dir
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: sorted.slice(start, start + query.pageSize),
+        total: sorted.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getGangDetail(id: string): Promise<GangDetail> {
+      let gi = 0
+      GANG_DATA.forEach((g, i) => {
+        if (g.id === id) gi = i
+      })
+      return delay(buildGangDetail(gi))
     },
   },
 

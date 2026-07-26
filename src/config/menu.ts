@@ -180,12 +180,7 @@ export const MENU: MenuEntry[] = [
         key: 'model-fraud-gang',
         title: '虚开团伙识别',
         path: '/model/fraud-gang',
-        status: 'placeholder',
-        desc: [
-          '结合图谱与行为特征识别虚开发票团伙及其组织结构。',
-          '输出团伙成员、资金/发票流向与风险传导链路。',
-          '对应需求 3.7 / 4.3.2 虚开识别。',
-        ],
+        status: 'done',
       },
       {
         key: 'model-abnormal-declare',

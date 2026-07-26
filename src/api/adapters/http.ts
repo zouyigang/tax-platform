@@ -40,6 +40,10 @@ import type {
   EntityMatchFilters,
   EntityMatchQuery,
   EntityMatchRow,
+  GangDetail,
+  GangFilters,
+  GangQuery,
+  GangRow,
   QualityDashboard,
   EffectivenessAnalysis,
   GraphData,
@@ -240,6 +244,24 @@ export const httpClient: ApiClient = {
     },
     getScoreAttribution(taxId: string): Promise<ScoreAttribution> {
       return get<ScoreAttribution>(`/model/score/${encodeURIComponent(taxId)}/attribution`)
+    },
+    getGangFilters(): Promise<GangFilters> {
+      return get<GangFilters>('/model/gang/filters')
+    },
+    getGangs(query: GangQuery): Promise<PagedResult<GangRow>> {
+      return get<PagedResult<GangRow>>('/model/gang', {
+        keyword: query.keyword,
+        districtCode: query.districtCode,
+        // 数组条件以逗号分隔传递
+        patterns: query.patterns.join(','),
+        sortKey: query.sortKey,
+        sortDir: query.sortDir,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getGangDetail(id: string): Promise<GangDetail> {
+      return get<GangDetail>(`/model/gang/${encodeURIComponent(id)}`)
     },
   },
 

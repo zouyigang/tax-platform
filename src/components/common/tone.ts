@@ -7,6 +7,8 @@ import type {
   BackfillStatus,
   ClueStatus,
   DeltaTone,
+  GangPattern,
+  GangStatus,
   MatchStatus,
   RiskLevel,
   RuleStatus,
@@ -153,4 +155,34 @@ export const VERDICT_LABEL: Record<RuleVerdict, string> = {
   effective: '有效',
   tuning: '待优化',
   retire: '建议下线',
+}
+
+/** 团伙结构模式 → 展示文案 */
+export const GANG_PATTERN_LABEL: Record<GangPattern, string> = {
+  ring: '环状',
+  star: '星状',
+  chain: '链状',
+}
+
+/** 团伙结构模式 → 说明(列表内二行小字) */
+export const GANG_PATTERN_NOTE: Record<GangPattern, string> = {
+  ring: '闭环互开',
+  star: '一票多流',
+  chain: '层层过票',
+}
+
+/** 团伙核查状态 → 语气 */
+export const GANG_STATUS_TONE: Record<GangStatus, ToneName> = {
+  new: 'pending',
+  checking: 'primary',
+  confirmed: 'danger',
+  excluded: 'neutral',
+}
+
+/** 团伙核查状态 → 展示文案 */
+export const GANG_STATUS_LABEL: Record<GangStatus, string> = {
+  new: '待核查',
+  checking: '核查中',
+  confirmed: '已确认',
+  excluded: '已排除',
 }

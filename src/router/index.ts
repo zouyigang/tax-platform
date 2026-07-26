@@ -26,6 +26,7 @@ import DispatchView from '@/views/riskmgmt/DispatchView.vue'
 import BackfillView from '@/views/riskmgmt/BackfillView.vue'
 import PerformanceView from '@/views/riskmgmt/PerformanceView.vue'
 import ScoreView from '@/views/model/ScoreView.vue'
+import FraudGangView from '@/views/model/FraudGangView.vue'
 import TrialView from '@/views/ruleops/TrialView.vue'
 import ThresholdView from '@/views/ruleops/ThresholdView.vue'
 import EffectMonitorView from '@/views/ruleops/EffectMonitorView.vue'
@@ -42,6 +43,7 @@ const DONE_VIEWS: Record<string, Component> = {
   'app-qa': QaView,
   'model-score': ScoreView,
   'model-graph': GraphView,
+  'model-fraud-gang': FraudGangView,
   'decision-revenue': RevenueAnalysisView,
   'decision-tax-source': TaxSourceAnalysisView,
   'decision-effectiveness': EffectivenessAnalysisView,
