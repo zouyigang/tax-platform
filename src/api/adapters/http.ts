@@ -34,6 +34,10 @@ import type {
   DispatchFilters,
   DispatchQuery,
   DispatchRow,
+  DocMaterialDetail,
+  DocMaterialRow,
+  DocProcessFilters,
+  DocProcessQuery,
   EffectMonitor,
   PerformanceStats,
   ThresholdFilters,
@@ -231,6 +235,21 @@ export const httpClient: ApiClient = {
   qa: {
     getQaSession(): Promise<QaSession> {
       return get<QaSession>('/qa/session')
+    },
+  },
+
+  app: {
+    getDocProcessFilters(): Promise<DocProcessFilters> {
+      return get<DocProcessFilters>('/app/doc-process/filters')
+    },
+    getDocMaterials(query: DocProcessQuery): Promise<DocMaterialRow[]> {
+      return get<DocMaterialRow[]>('/app/doc-process/materials', {
+        keyword: query.keyword,
+        status: query.status,
+      })
+    },
+    getDocMaterialDetail(id: string): Promise<DocMaterialDetail> {
+      return get<DocMaterialDetail>(`/app/doc-process/materials/${encodeURIComponent(id)}`)
     },
   },
 

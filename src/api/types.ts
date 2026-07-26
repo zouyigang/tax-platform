@@ -3082,6 +3082,158 @@ export interface TaxSourceApi {
 }
 
 /* ========================================================================
+ * 十三、智能应用（App）· 资料智能处理
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》5.4 智能资料处理。
+ * 形态是「左右对照的抽取工作台」,不是对话:
+ *   左边是原件、右边是结构化字段,两边靠坐标双向联动 ——
+ *   人要做的事是「核对」,而核对的前提是能一眼看到这个值是从原件哪儿抠出来的。
+ * 因此接口必须下发字段在原件上的位置(box),不能只给键值对。
+ * 注:政策智能问答的接口历史上单列在 qa 分组。
+ * ====================================================================== */
+
+/** 材料类型:合同 / 发票 */
+export type DocMaterialType = 'contract' | 'invoice'
+
+/** 材料处理状态 */
+export type DocTaskStatus = 'pending' | 'processing' | 'done' | 'review'
+
+/**
+ * 原件版式块(演示用:代替真实扫描件影像)
+ * 坐标与尺寸均为页面百分比,与字段 box 同一坐标系,便于高亮框精确对位。
+ */
+export interface DocBlock {
+  /** 文本内容 */
+  text: string
+  /** 左上角 X(页面宽度百分比) */
+  x: number
+  /** 左上角 Y(页面高度百分比) */
+  y: number
+  /** 宽度(页面宽度百分比) */
+  w: number
+  /** 字号档 */
+  size: 'title' | 'sub' | 'body' | 'small'
+  /** 是否加粗 */
+  bold: boolean
+  /** 对齐方式 */
+  align: 'left' | 'center' | 'right'
+}
+
+/** 字段在原件上的位置(页面百分比) */
+export interface FieldBox {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** 抽取字段 */
+export interface ExtractField {
+  /** 字段键 */
+  key: string
+  /** 字段名 */
+  label: string
+  /** 抽取值 */
+  value: string
+  /** 置信度(0–1) */
+  confidence: number
+  /** 是否低于阈值、需人工确认 */
+  needConfirm: boolean
+  /** 在原件上的位置 */
+  box: FieldBox
+  /** 抽取来源说明(原文片段 / 识别方式) */
+  source: string
+}
+
+/** 应税行为与适用税目判定建议 */
+export interface TaxAdvice {
+  /** 应税行为 */
+  behavior: string
+  /** 适用税种 */
+  taxType: string
+  /** 税目 */
+  taxItem: string
+  /** 税率 / 征收率 */
+  rate: string
+  /** 判定依据 */
+  basis: string
+  /** 建议置信度(0–1) */
+  confidence: number
+}
+
+/** 材料队列行 */
+export interface DocMaterialRow {
+  /** 材料 id */
+  id: string
+  /** 材料名称 */
+  name: string
+  /** 材料类型 */
+  type: DocMaterialType
+  /** 处理状态 */
+  status: DocTaskStatus
+  /** 关联纳税人 */
+  taxpayerName: string
+  /** 上传时间 */
+  uploadedAt: string
+  /** 抽取字段数 */
+  fieldCount: number
+  /** 低置信字段数(需人工确认) */
+  lowConfCount: number
+}
+
+/** 材料抽取详情 */
+export interface DocMaterialDetail {
+  /** 材料 id */
+  id: string
+  /** 材料名称 */
+  name: string
+  /** 材料类型 */
+  type: DocMaterialType
+  /** 处理状态 */
+  status: DocTaskStatus
+  /** 关联纳税人 */
+  taxpayerName: string
+  /** 上传时间 */
+  uploadedAt: string
+  /** 识别引擎与版本 */
+  engine: string
+  /** 置信度阈值(低于此值要求人工确认) */
+  threshold: number
+  /** 原件版式(演示替代影像) */
+  layout: DocBlock[]
+  /** 抽取字段,按业务分组 */
+  groups: Array<{ title: string; fields: ExtractField[] }>
+  /** 应税行为与税目判定建议 */
+  taxAdvice: TaxAdvice[]
+}
+
+/** 资料处理·查询参数 */
+export interface DocProcessQuery {
+  /** 材料名称 / 纳税人关键字 */
+  keyword: string
+  /** 状态过滤;'all' 不限 */
+  status: string
+}
+
+/** 资料处理·队列筛选项 */
+export interface DocProcessFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 状态选项(附计数) */
+  statuses: Array<FilterOption & { count: number }>
+}
+
+/** 智能应用接口分组 */
+export interface AppApi {
+  /** 资料处理·队列筛选项 */
+  getDocProcessFilters(): Promise<DocProcessFilters>
+  /** 资料处理·材料队列 */
+  getDocMaterials(query: DocProcessQuery): Promise<DocMaterialRow[]>
+  /** 资料处理·单份材料的抽取结果 */
+  getDocMaterialDetail(id: string): Promise<DocMaterialDetail>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -3099,8 +3251,10 @@ export interface ApiClient {
   graph: GraphApi
   /** 智能模型 · 风险评分模型 */
   model: ModelApi
-  /** 税源监控 · 重点税源监控 */
+  /** 税源监控 · 重点税源监控 / 收入预测 / 新办企业评估 */
   taxsource: TaxSourceApi
+  /** 智能应用 · 资料智能处理 */
+  app: AppApi
   /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
   decision: DecisionApi
   /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */

@@ -247,12 +247,7 @@ export const MENU: MenuEntry[] = [
         key: 'app-doc-process',
         title: '资料智能处理',
         path: '/app/doc-process',
-        status: 'placeholder',
-        desc: [
-          '对上传的合同、账册、发票等资料进行 OCR 识别与要素抽取。',
-          '结构化归档并关联到对应纳税主体档案。',
-          '对应需求 5.4 智能资料处理。',
-        ],
+        status: 'done',
       },
       {
         key: 'app-nl-query',

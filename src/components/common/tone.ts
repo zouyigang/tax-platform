@@ -7,6 +7,7 @@ import type {
   BackfillStatus,
   ClueStatus,
   DeltaTone,
+  DocTaskStatus,
   GangPattern,
   GangStatus,
   KeySourceStatus,
@@ -202,4 +203,20 @@ export const KEY_STATUS_LABEL: Record<KeySourceStatus, string> = {
   watch: '关注',
   declining: '下降',
   alert: '预警',
+}
+
+/** 资料处理状态 → 语气 */
+export const DOC_STATUS_TONE: Record<DocTaskStatus, ToneName> = {
+  pending: 'pending',
+  processing: 'primary',
+  done: 'success',
+  review: 'danger',
+}
+
+/** 资料处理状态 → 展示文案 */
+export const DOC_STATUS_LABEL: Record<DocTaskStatus, string> = {
+  pending: '待处理',
+  processing: '处理中',
+  done: '已完成',
+  review: '需人工复核',
 }

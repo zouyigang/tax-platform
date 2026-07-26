@@ -20,6 +20,14 @@ import type {
   BoxStat,
   DeclineCause,
   DeltaTone,
+  DocBlock,
+  DocMaterialDetail,
+  DocMaterialRow,
+  DocMaterialType,
+  DocProcessFilters,
+  DocProcessQuery,
+  DocTaskStatus,
+  ExtractField,
   DeviationDirection,
   DeviationItem,
   ParallelDimension,
@@ -125,6 +133,7 @@ import type {
   ScoreRow,
   ShapItem,
   SourceContribution,
+  TaxAdvice,
   TaxTypeStructure,
 } from '../types'
 
@@ -1575,6 +1584,208 @@ function buildNewEntDetail(row: RawNewEnt): NewEntDetail {
             : '建议按常规新办户管理,无需专项介入。',
   }
 }
+
+/* ==================== 智能应用:资料智能处理演示数据 ==================== */
+
+/** 低于此置信度要求人工确认 */
+const DP_THRESHOLD = 0.85
+
+/** 材料队列种子 */
+const DP_SEED: Array<{ type: DocMaterialType; status: DocTaskStatus; taxIdx: number }> = [
+  { type: 'contract', status: 'review', taxIdx: 0 },
+  { type: 'invoice', status: 'review', taxIdx: 1 },
+  { type: 'contract', status: 'done', taxIdx: 2 },
+  { type: 'invoice', status: 'done', taxIdx: 3 },
+  { type: 'contract', status: 'done', taxIdx: 4 },
+  { type: 'invoice', status: 'processing', taxIdx: 5 },
+  { type: 'contract', status: 'processing', taxIdx: 6 },
+  { type: 'invoice', status: 'pending', taxIdx: 7 },
+  { type: 'contract', status: 'pending', taxIdx: 8 },
+  { type: 'invoice', status: 'pending', taxIdx: 9 },
+  { type: 'contract', status: 'done', taxIdx: 10 },
+  { type: 'invoice', status: 'done', taxIdx: 11 },
+]
+
+/** 合同版式与抽取字段 */
+function dpContract(i: number, taxpayer: string) {
+  const no = `HT2026-${String(310 + i)}`
+  const seller = SCORE_DATA[(i + 5) % SCORE_DATA.length].taxpayerName
+  const amount = 268 + i * 37
+  const amountStr = `¥${(amount * 10000).toLocaleString('en-US')}.00`
+  const cnAmount = `人民币${['贰佰陆拾捌', '叁佰零伍', '叁佰肆拾贰', '叁佰柒拾玖', '肆佰壹拾陆', '肆佰伍拾叁'][i % 6]}万元整`
+  const goods = ['热轧钢板、H 型钢 共计 380 吨', '水泥、砂石料 共计 1,200 吨', '铝合金型材 共计 96 吨', '电缆桥架及配件 一批'][i % 4]
+  const start = `2026 年 ${3 + (i % 4)} 月 15 日`
+  const end = `2026 年 ${9 + (i % 3)} 月 30 日`
+  const settle = ['银行转账,分三期支付:预付 30%、到货 50%、验收 20%', '银行转账,货到验收后 30 日内一次性结清', '银行承兑汇票,账期 90 日'][i % 3]
+
+  const layout: DocBlock[] = [
+    { text: '购 销 合 同', x: 0, y: 5, w: 100, size: 'title', bold: true, align: 'center' },
+    { text: `合同编号:${no}`, x: 0, y: 12, w: 92, size: 'small', bold: false, align: 'right' },
+    { text: `甲方(采购方):${taxpayer}`, x: 8, y: 19, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: `乙方(供应方):${seller}`, x: 8, y: 25, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: '第一条  合同标的', x: 8, y: 34, w: 84, size: 'sub', bold: true, align: 'left' },
+    { text: `本合同标的为:${goods}。质量标准按国家标准执行。`, x: 8, y: 39, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: '第二条  合同金额', x: 8, y: 47, w: 84, size: 'sub', bold: true, align: 'left' },
+    { text: `含税总价:${cnAmount}(${amountStr}),税率 13%。`, x: 8, y: 52, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: '第三条  履行期限', x: 8, y: 60, w: 84, size: 'sub', bold: true, align: 'left' },
+    { text: `自 ${start} 起至 ${end} 止,分批交付。`, x: 8, y: 65, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: '第四条  结算方式', x: 8, y: 73, w: 84, size: 'sub', bold: true, align: 'left' },
+    { text: settle, x: 8, y: 78, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: '甲方(盖章):                    乙方(盖章):', x: 8, y: 88, w: 84, size: 'body', bold: false, align: 'left' },
+    { text: `签订日期:2026 年 ${3 + (i % 4)} 月 12 日`, x: 8, y: 93, w: 84, size: 'small', bold: false, align: 'left' },
+  ]
+
+  const groups = [
+    {
+      title: '双方主体',
+      fields: [
+        { key: 'buyer', label: '甲方(采购方)', value: taxpayer, confidence: 0.97, box: { x: 8, y: 18, w: 62, h: 5 }, source: '原文「甲方(采购方):」后接文本' },
+        { key: 'seller', label: '乙方(供应方)', value: seller, confidence: 0.96, box: { x: 8, y: 24, w: 62, h: 5 }, source: '原文「乙方(供应方):」后接文本' },
+        { key: 'no', label: '合同编号', value: no, confidence: 0.99, box: { x: 62, y: 11, w: 30, h: 4.5 }, source: '页眉右上角编号区' },
+      ],
+    },
+    {
+      title: '标的与金额',
+      fields: [
+        { key: 'goods', label: '合同标的', value: goods, confidence: 0.88, box: { x: 8, y: 38, w: 84, h: 5 }, source: '第一条正文,已剔除质量标准描述' },
+        { key: 'amount', label: '含税总价', value: amountStr, confidence: 0.99, box: { x: 8, y: 51, w: 84, h: 5 }, source: '第二条,大小写金额一致性校验通过' },
+        { key: 'rate', label: '合同注明税率', value: '13%', confidence: 0.94, box: { x: 8, y: 51, w: 84, h: 5 }, source: '第二条末尾' },
+      ],
+    },
+    {
+      title: '履行与结算',
+      fields: [
+        { key: 'start', label: '履行起始日', value: start, confidence: 0.93, box: { x: 8, y: 64, w: 84, h: 5 }, source: '第三条,日期格式已规范化' },
+        { key: 'end', label: '履行终止日', value: end, confidence: 0.93, box: { x: 8, y: 64, w: 84, h: 5 }, source: '第三条,日期格式已规范化' },
+        { key: 'settle', label: '结算方式', value: settle, confidence: 0.79, box: { x: 8, y: 77, w: 84, h: 5 }, source: '第四条整段,分期比例为模型归纳' },
+        { key: 'signDate', label: '签订日期', value: `2026-0${3 + (i % 4)}-12`, confidence: 0.91, box: { x: 8, y: 92, w: 46, h: 4.5 }, source: '落款日期' },
+      ],
+    },
+  ]
+
+  const taxAdvice: TaxAdvice[] = [
+    { behavior: '销售货物(乙方)', taxType: '增值税', taxItem: '销售货物', rate: '13%', basis: '合同标的为有形动产,约定税率 13%,与货物销售税目一致', confidence: 0.95 },
+    { behavior: '书立购销合同', taxType: '印花税', taxItem: '买卖合同', rate: '0.3‰', basis: '《印花税法》买卖合同税目,计税依据为不含税价款', confidence: 0.92 },
+    { behavior: '取得进项(甲方)', taxType: '增值税', taxItem: '进项税额抵扣', rate: '—', basis: '需取得合规增值税专用发票并与资金流、货物流一致方可抵扣', confidence: 0.74 },
+  ]
+
+  return { layout, groups, taxAdvice }
+}
+
+/** 发票版式与抽取字段 */
+function dpInvoice(i: number, taxpayer: string) {
+  const code = '3300264130'
+  const num = `0884${String(7210 + i)}`
+  const seller = SCORE_DATA[(i + 9) % SCORE_DATA.length].taxpayerName
+  const amountNum = 186400 + i * 23100
+  const taxNum = Math.round(amountNum * 0.13)
+  const total = amountNum + taxNum
+  const item = ['*钢材*热轧钢板', '*水泥*普通硅酸盐水泥', '*铝材*铝合金型材', '*电气设备*电缆桥架'][i % 4]
+  const money2 = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  const layout: DocBlock[] = [
+    { text: '××省增值税专用发票', x: 0, y: 4, w: 100, size: 'title', bold: true, align: 'center' },
+    { text: `发票代码 ${code}`, x: 58, y: 11, w: 36, size: 'small', bold: false, align: 'left' },
+    { text: `发票号码 ${num}`, x: 58, y: 15, w: 36, size: 'small', bold: false, align: 'left' },
+    { text: `开票日期 2026 年 0${3 + (i % 6)} 月 ${10 + i} 日`, x: 58, y: 19, w: 36, size: 'small', bold: false, align: 'left' },
+    { text: '购买方', x: 6, y: 26, w: 8, size: 'small', bold: false, align: 'left' },
+    { text: `名称:${taxpayer}`, x: 15, y: 25, w: 78, size: 'body', bold: false, align: 'left' },
+    { text: '纳税人识别号:91....MA2Q7X', x: 15, y: 30, w: 78, size: 'small', bold: false, align: 'left' },
+    { text: '销售方', x: 6, y: 38, w: 8, size: 'small', bold: false, align: 'left' },
+    { text: `名称:${seller}`, x: 15, y: 37, w: 78, size: 'body', bold: false, align: 'left' },
+    { text: '纳税人识别号:91....MA8P4V', x: 15, y: 42, w: 78, size: 'small', bold: false, align: 'left' },
+    { text: '货物或应税劳务、服务名称      规格型号    数量      单价        金额        税率    税额', x: 6, y: 50, w: 88, size: 'small', bold: true, align: 'left' },
+    { text: `${item}          Q235B      120     ${money2(amountNum / 120)}    ${money2(amountNum)}     13%   ${money2(taxNum)}`, x: 6, y: 56, w: 88, size: 'small', bold: false, align: 'left' },
+    { text: `合计                                                        ¥${money2(amountNum)}          ¥${money2(taxNum)}`, x: 6, y: 66, w: 88, size: 'small', bold: false, align: 'left' },
+    { text: `价税合计(大写)  ${['贰拾壹万零伍佰', '贰拾叁万柒仟', '贰拾陆万叁仟', '贰拾捌万玖仟'][i % 4]}元整          (小写) ¥${money2(total)}`, x: 6, y: 74, w: 88, size: 'body', bold: true, align: 'left' },
+    { text: '备注:', x: 6, y: 82, w: 88, size: 'small', bold: false, align: 'left' },
+    { text: '收款人:  复核:  开票人:  销售方(章):', x: 6, y: 92, w: 88, size: 'small', bold: false, align: 'left' },
+  ]
+
+  const groups = [
+    {
+      title: '票面标识',
+      fields: [
+        { key: 'code', label: '发票代码', value: code, confidence: 0.99, box: { x: 57, y: 10, w: 37, h: 4 }, source: 'OCR 版面识别 · 票头右侧' },
+        { key: 'num', label: '发票号码', value: num, confidence: 0.99, box: { x: 57, y: 14, w: 37, h: 4 }, source: 'OCR 版面识别 · 票头右侧' },
+        { key: 'date', label: '开票日期', value: `2026-0${3 + (i % 6)}-${10 + i}`, confidence: 0.97, box: { x: 57, y: 18, w: 37, h: 4 }, source: '票头右侧,已规范化为 ISO 日期' },
+      ],
+    },
+    {
+      title: '购销双方',
+      fields: [
+        { key: 'buyer', label: '购买方名称', value: taxpayer, confidence: 0.96, box: { x: 14, y: 24, w: 79, h: 4.5 }, source: '购买方栏「名称」字段' },
+        { key: 'buyerId', label: '购买方识别号', value: '91....MA2Q7X', confidence: 0.82, box: { x: 14, y: 29, w: 79, h: 4 }, source: '购买方栏,末位字符识别存疑' },
+        { key: 'seller', label: '销售方名称', value: seller, confidence: 0.95, box: { x: 14, y: 36, w: 79, h: 4.5 }, source: '销售方栏「名称」字段' },
+        { key: 'sellerId', label: '销售方识别号', value: '91....MA8P4V', confidence: 0.93, box: { x: 14, y: 41, w: 79, h: 4 }, source: '销售方栏' },
+      ],
+    },
+    {
+      title: '金额与品名',
+      fields: [
+        { key: 'item', label: '货物或劳务名称', value: item, confidence: 0.9, box: { x: 5, y: 55, w: 40, h: 4.5 }, source: '明细行首列,已识别简称编码' },
+        { key: 'amount', label: '金额(不含税)', value: `¥${money2(amountNum)}`, confidence: 0.99, box: { x: 5, y: 65, w: 89, h: 4.5 }, source: '合计行,与明细行加总校验一致' },
+        { key: 'taxRate', label: '税率', value: '13%', confidence: 0.98, box: { x: 5, y: 55, w: 89, h: 4.5 }, source: '明细行税率列' },
+        { key: 'tax', label: '税额', value: `¥${money2(taxNum)}`, confidence: 0.99, box: { x: 5, y: 65, w: 89, h: 4.5 }, source: '合计行,与金额×税率校验一致' },
+        { key: 'total', label: '价税合计', value: `¥${money2(total)}`, confidence: 0.84, box: { x: 5, y: 73, w: 89, h: 5 }, source: '大小写金额比对存在字形歧义,建议人工核对' },
+      ],
+    },
+  ]
+
+  const taxAdvice: TaxAdvice[] = [
+    { behavior: '取得增值税专用发票', taxType: '增值税', taxItem: '进项税额', rate: '13%', basis: '票面税率与货物销售税目匹配,可按票面税额申报抵扣', confidence: 0.94 },
+    { behavior: '货物购进入账', taxType: '企业所得税', taxItem: '成本费用扣除', rate: '—', basis: '需与合同、入库单、付款凭证四流一致方可税前扣除', confidence: 0.81 },
+    { behavior: '发票真伪核验', taxType: '—', taxItem: '发票查验', rate: '—', basis: '建议经全国增值税发票查验平台核验后入账', confidence: 0.99 },
+  ]
+
+  return { layout, groups, taxAdvice }
+}
+
+/** 组装材料详情(补齐 needConfirm) */
+function buildDocDetail(id: string): DocMaterialDetail {
+  let i = 0
+  DP_SEED.forEach((_, k) => {
+    if (`DM2026-${String(4100 + k)}` === id) i = k
+  })
+  const seed = DP_SEED[i]
+  const taxpayer = SCORE_DATA[seed.taxIdx % SCORE_DATA.length].taxpayerName
+  const built = seed.type === 'contract' ? dpContract(i, taxpayer) : dpInvoice(i, taxpayer)
+  const groups = built.groups.map((g) => ({
+    title: g.title,
+    fields: g.fields.map((f) => ({ ...f, needConfirm: f.confidence < DP_THRESHOLD })),
+  }))
+  return {
+    id,
+    name: `${taxpayer}·${seed.type === 'contract' ? '购销合同' : '增值税专用发票'}`,
+    type: seed.type,
+    status: seed.status,
+    taxpayerName: taxpayer,
+    uploadedAt: `2026-07-${String(24 - i).padStart(2, '0')} ${String(9 + (i % 8)).padStart(2, '0')}:${String((i * 7) % 60).padStart(2, '0')}`,
+    engine: seed.type === 'contract' ? '版面分析 v2.4 + 合同要素抽取 v1.8' : '票面 OCR v3.1 + 发票要素抽取 v2.2',
+    threshold: DP_THRESHOLD,
+    layout: built.layout,
+    groups,
+    taxAdvice: built.taxAdvice,
+  }
+}
+
+/** 材料队列 */
+const DOC_MATERIAL_DATA: DocMaterialRow[] = DP_SEED.map((seed, i) => {
+  const id = `DM2026-${String(4100 + i)}`
+  const d = buildDocDetail(id)
+  const fields = d.groups.reduce((s, g) => s.concat(g.fields), [] as ExtractField[])
+  return {
+    id,
+    name: d.name,
+    type: d.type,
+    status: d.status,
+    taxpayerName: d.taxpayerName,
+    uploadedAt: d.uploadedAt,
+    // 未处理完的材料尚无抽取结果,队列上就不该显示字段数
+    fieldCount: seed.status === 'pending' || seed.status === 'processing' ? 0 : fields.length,
+    lowConfCount: seed.status === 'pending' || seed.status === 'processing' ? 0 : fields.filter((f) => f.needConfirm).length,
+  }
+})
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
@@ -3122,6 +3333,37 @@ export const mockClient: ApiClient = {
       })
 
       return delay({ rootName: '城东区某建材经营部', rootId: 'n1', nodes, edges, details })
+    },
+  },
+
+  /* ==================== 智能应用 · 资料智能处理 ==================== */
+  app: {
+    getDocProcessFilters(): Promise<DocProcessFilters> {
+      const count = (s: DocTaskStatus) => DOC_MATERIAL_DATA.filter((m) => m.status === s).length
+      return delay({
+        updatedAt: '2026-07-24 08:30',
+        statuses: [
+          { value: 'pending', label: '待处理', count: count('pending') },
+          { value: 'processing', label: '处理中', count: count('processing') },
+          { value: 'done', label: '已完成', count: count('done') },
+          { value: 'review', label: '需人工复核', count: count('review') },
+        ],
+      })
+    },
+
+    getDocMaterials(query: DocProcessQuery): Promise<DocMaterialRow[]> {
+      const kw = query.keyword.trim()
+      return delay(
+        DOC_MATERIAL_DATA.filter((m) => {
+          if (query.status !== 'all' && m.status !== query.status) return false
+          if (kw && m.name.indexOf(kw) < 0 && m.taxpayerName.indexOf(kw) < 0 && m.id.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+          return true
+        }),
+      )
+    },
+
+    getDocMaterialDetail(id: string): Promise<DocMaterialDetail> {
+      return delay(buildDocDetail(id))
     },
   },
 
