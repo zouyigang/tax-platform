@@ -177,7 +177,7 @@ function toast(text: string) {
   toastVisible.value = true
 }
 function viewMemberArchive(taxId: string) {
-  router.push(`/archive?taxId=${encodeURIComponent(taxId)}`)
+  router.push(`/archive?taxpayerId=${encodeURIComponent(taxId)}`)
 }
 
 /* ---------------- 表格 ---------------- */

@@ -1,31 +1,44 @@
 <script setup lang="ts">
 /**
- * 一户式档案详情
- * 六大类标签页同页切换(tab 写入 URL query,可分享 / 可回退),
- * 每个标签页独立取数、独立四态。
+ * 一户式主档查询
+ * 档案主体由 URL 的 taxpayerId 决定,不再固定展示某一户:
+ *   有参数 → 档案态(顶部搜索区收起为一行,可点「切换企业」重新展开);
+ *   无参数 → 空态(展开的搜索框 + 最近查看 / 我管辖的重点税源两个快捷列表)。
+ * 六大类标签页同页切换(tab 写入 URL query,可分享 / 可回退),各自独立取数与四态。
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import type { ArchiveTab, ArchiveTaxRow, FilterOption } from '@/api/types'
+import type { ArchiveTab, ArchiveTaxRow, FilterOption, TaxpayerBrief } from '@/api/types'
 import { useResource } from '@/composables/useResource'
+import { useRecentTaxpayers } from '@/composables/useRecentTaxpayers'
 import StateBlock from '@/components/StateBlock.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import TabNav from '@/components/common/TabNav.vue'
 import BaseBadge from '@/components/common/BaseBadge.vue'
+import BaseSelect from '@/components/common/BaseSelect.vue'
 import MetricCard from '@/components/common/MetricCard.vue'
 import DataTable from '@/components/common/DataTable.vue'
+import TaxpayerSearch from '@/components/common/TaxpayerSearch.vue'
 import InvoiceBarChart from '@/components/charts/InvoiceBarChart.vue'
 import type { TableColumn } from '@/components/common/table'
-import { RISK_LABEL, RISK_TONE } from '@/components/common/tone'
+import { REG_STATUS_LABEL, REG_STATUS_TONE, RISK_LABEL, RISK_TONE } from '@/components/common/tone'
 
 const route = useRoute()
 const router = useRouter()
+const { recent, push: pushRecent } = useRecentTaxpayers()
 
-/** 档案主体:由 URL query 带入,缺省用演示企业 */
-const taxId = computed(() =>
-  typeof route.query.taxId === 'string' && route.query.taxId ? route.query.taxId : '91330100MA2Q7X',
-)
+/**
+ * 档案主体:取自 URL 的 taxpayerId;
+ * 兼容早期链接使用的 taxId 参数(站内已全部改为 taxpayerId,此处仅作向后兼容)。
+ */
+const taxId = ref('')
+function readTaxpayerFromRoute(): string {
+  const q = route.query
+  if (typeof q.taxpayerId === 'string' && q.taxpayerId) return q.taxpayerId
+  if (typeof q.taxId === 'string' && q.taxId) return q.taxId
+  return ''
+}
 
 const TABS: FilterOption[] = [
   { value: 'base', label: '基础信息' },
@@ -48,29 +61,146 @@ const declare = useResource(() => api.archive.getArchiveDeclare(taxId.value))
 const invoice = useResource(() => api.archive.getArchiveInvoice(taxId.value))
 const evaluation = useResource(() => api.archive.getArchiveEvaluation(taxId.value))
 
-/** 按当前标签页加载对应数据(已加载过的不重复请求) */
+/** 已按当前主体取过数的标签页;切换企业时清空,避免沿用上一户的数据 */
+const loadedTabs = ref<string[]>([])
+
 function loadTab() {
-  if (tab.value === 'base' || tab.value === 'reg' || tab.value === 'biz') profile.load()
-  else if (tab.value === 'declare') {
-    if (declare.status.value === 'idle') declare.load()
-  } else if (tab.value === 'invoice') {
-    if (invoice.status.value === 'idle') invoice.load()
-  } else if (tab.value === 'eval') {
-    if (evaluation.status.value === 'idle') evaluation.load()
+  if (!taxId.value) return
+  if (tab.value === 'base' || tab.value === 'reg' || tab.value === 'biz') {
+    profile.load()
+    return
   }
+  if (loadedTabs.value.indexOf(tab.value) >= 0) return
+  loadedTabs.value.push(tab.value)
+  if (tab.value === 'declare') declare.load()
+  else if (tab.value === 'invoice') invoice.load()
+  else if (tab.value === 'eval') evaluation.load()
+}
+
+/**
+ * 载入某一户的档案(taxId 已变更后调用)
+ * 概要返回后补记「最近查看」—— 从其他页点纳税人名称直接跳进来的情况也要记上,
+ * 否则最近查看只会记住手工搜索过的户,失去意义。
+ */
+async function loadArchive() {
+  if (!taxId.value) return
+  loadedTabs.value = []
+  loadTab()
+  await summary.load()
+  const s = summary.data.value
+  if (s && taxId.value) pushRecent(taxId.value, s.taxpayerName)
 }
 
 onMounted(() => {
   const q = route.query.tab
   if (typeof q === 'string' && TABS.some((t) => t.value === q)) tab.value = q as ArchiveTab
-  summary.load()
-  loadTab()
+  taxId.value = readTaxpayerFromRoute()
+  // 顶栏全局搜索回车未选中联想项时会带 keyword 进来,直接展开检索结果
+  const kw = route.query.keyword
+  if (typeof kw === 'string' && kw) {
+    pageKeyword.value = kw
+    results.load()
+  }
+  if (taxId.value) loadArchive()
+  else {
+    keyList.load()
+    loadRecent()
+  }
 })
+
+// 浏览器前进后退 / 站内跳转都会改 query,统一在此响应
+watch(
+  () => route.query.taxpayerId,
+  () => {
+    const next = readTaxpayerFromRoute()
+    if (next === taxId.value) return
+    taxId.value = next
+    if (taxId.value) loadArchive()
+    else {
+      keyList.load()
+      loadRecent()
+    }
+  },
+)
 
 watch(tab, (v) => {
   router.replace({ query: { ...route.query, tab: v } })
   loadTab()
 })
+
+/* ---------------- 搜索区 ---------------- */
+/** 已选中企业时搜索区收起为一行;点「切换企业」展开 */
+const searchOpen = ref(false)
+const advancedOpen = ref(false)
+const pageKeyword = ref('')
+
+const industryCode = ref('all')
+const regStatus = ref('all')
+const authorityCode = ref('all')
+const riskLevel = ref('all')
+const qualification = ref('all')
+
+const searchFilters = useResource(() => api.archive.getTaxpayerSearchFilters())
+const activeFilters = computed(() => ({
+  industryCode: industryCode.value,
+  regStatus: regStatus.value,
+  authorityCode: authorityCode.value,
+  riskLevel: riskLevel.value,
+  qualification: qualification.value,
+}))
+/** 已启用的高级筛选项数(收起时显示在按钮上) */
+const activeFilterCount = computed(
+  () => [industryCode, regStatus, authorityCode, riskLevel, qualification].filter((r) => r.value !== 'all').length,
+)
+
+const results = useResource(
+  () =>
+    api.archive.searchTaxpayers({
+      keyword: pageKeyword.value,
+      ...activeFilters.value,
+      page: 1,
+      pageSize: 20,
+    }),
+  { isEmpty: (d) => d.items.length === 0 },
+)
+
+function runSearch() {
+  results.load()
+}
+function resetFilters() {
+  industryCode.value = 'all'
+  regStatus.value = 'all'
+  authorityCode.value = 'all'
+  riskLevel.value = 'all'
+  qualification.value = 'all'
+  if (results.status.value !== 'idle') results.load()
+}
+function openSwitch() {
+  searchOpen.value = true
+  advancedOpen.value = false
+}
+
+/* ---------------- 快捷列表 ---------------- */
+const keyList = useResource(() => api.archive.getMyKeyTaxpayers())
+const recentList = useResource(() => api.archive.getTaxpayersByIds(recent.value.map((r) => r.taxpayerId)))
+function loadRecent() {
+  if (recent.value.length) recentList.load()
+}
+
+/* ---------------- 选中企业 ---------------- */
+function selectTaxpayer(t: TaxpayerBrief) {
+  pushRecent(t.taxpayerId, t.name)
+  searchOpen.value = false
+  pageKeyword.value = ''
+  // 用 push 而非 replace,保证浏览器前进后退可在不同企业间切换
+  router.push({ path: '/archive', query: { taxpayerId: t.taxpayerId, tab: tab.value } })
+}
+/** 回到空态(不带任何主体) */
+function backToEmpty() {
+  router.push({ path: '/archive' })
+}
+
+const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 })
 
 /* ---------------- 分税种表格 ---------------- */
 const taxColumns: TableColumn[] = [
@@ -96,14 +226,170 @@ const taxSum = computed(() => {
   <div class="archive">
     <PageHeader title="一户式主档查询" breadcrumb="首页 / 数据治理 / 一户式主档查询">
       <template #actions>
-        <button type="button" class="btn">导出档案</button>
-        <button type="button" class="btn btn--primary">发起核查</button>
+        <button type="button" class="btn" :disabled="!taxId">导出档案</button>
+        <button type="button" class="btn btn--primary" :disabled="!taxId">发起核查</button>
       </template>
     </PageHeader>
 
     <div class="archive__body">
+      <!-- ══ 搜索区:未选中企业时展开,已选中时收起为一行 ══ -->
+      <section v-if="taxId && !searchOpen" class="bar">
+        <span class="bar__label">当前企业</span>
+        <span class="bar__name">{{ summary.data.value ? summary.data.value.taxpayerName : '加载中…' }}</span>
+        <span class="bar__id num">{{ taxId }}</span>
+        <button type="button" class="btn bar__btn" @click="openSwitch">切换企业</button>
+        <button type="button" class="btn bar__btn" @click="backToEmpty">返回检索</button>
+      </section>
+
+      <section v-else class="search" :class="{ 'search--empty': !taxId }">
+        <div class="search__row">
+          <TaxpayerSearch
+            v-model="pageKeyword"
+            size="page"
+            :filters="activeFilters"
+            :autofocus="searchOpen"
+            @select="selectTaxpayer"
+            @submit="runSearch"
+          />
+          <button type="button" class="btn" @click="advancedOpen = !advancedOpen">
+            高级筛选 {{ advancedOpen ? '▲' : '▼' }}
+            <span v-if="activeFilterCount" class="search__count num">{{ activeFilterCount }}</span>
+          </button>
+          <button type="button" class="btn btn--primary" @click="runSearch">查询</button>
+          <button v-if="taxId" type="button" class="btn" @click="searchOpen = false">取消</button>
+        </div>
+
+        <div v-if="advancedOpen && searchFilters.data.value" class="adv">
+          <div class="adv__item">
+            <label>行业</label>
+            <BaseSelect v-model="industryCode" :options="searchFilters.data.value.industries" width="100%" />
+          </div>
+          <div class="adv__item">
+            <label>登记状态</label>
+            <BaseSelect v-model="regStatus" :options="searchFilters.data.value.regStatuses" width="100%" />
+          </div>
+          <div class="adv__item adv__item--wide">
+            <label>主管税务机关</label>
+            <BaseSelect v-model="authorityCode" :options="searchFilters.data.value.authorities" width="100%" />
+          </div>
+          <div class="adv__item">
+            <label>风险等级</label>
+            <BaseSelect v-model="riskLevel" :options="searchFilters.data.value.riskLevels" width="100%" />
+          </div>
+          <div class="adv__item">
+            <label>纳税人资格</label>
+            <BaseSelect v-model="qualification" :options="searchFilters.data.value.qualifications" width="100%" />
+          </div>
+          <div class="adv__act">
+            <button type="button" class="btn" @click="resetFilters">重置筛选</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ 空态:检索结果 或 两个快捷列表 ══ -->
+      <template v-if="!taxId">
+        <!-- 已执行检索:出结果列表 -->
+        <section v-if="results.status.value !== 'idle'" class="panel">
+          <div class="panel__head">
+            <span class="panel__title">检索结果</span>
+            <span v-if="results.data.value" class="panel__sub num">共 {{ results.data.value.total }} 户</span>
+          </div>
+          <div class="panel__body">
+            <StateBlock
+              :status="results.status.value"
+              :error="results.error.value"
+              empty-text="未匹配到纳税人"
+              empty-hint="可调整关键词或放宽高级筛选条件"
+              @retry="results.load()"
+            >
+              <div v-if="results.data.value" class="hits">
+                <div
+                  v-for="t in results.data.value.items"
+                  :key="t.taxpayerId"
+                  class="hit"
+                  @click="selectTaxpayer(t)"
+                >
+                  <div class="hit__line">
+                    <span class="hit__name">{{ t.name }}</span>
+                    <BaseBadge :tone="REG_STATUS_TONE[t.regStatus]" variant="dot">
+                      {{ REG_STATUS_LABEL[t.regStatus] }}
+                    </BaseBadge>
+                    <BaseBadge :tone="RISK_TONE[t.riskLevel]">{{ RISK_LABEL[t.riskLevel] }}</BaseBadge>
+                  </div>
+                  <div class="hit__meta num">
+                    {{ t.taxpayerId }} · {{ t.industry }} · {{ t.district }} · {{ t.authority }}
+                  </div>
+                </div>
+              </div>
+            </StateBlock>
+          </div>
+        </section>
+
+        <!-- 未检索:两个快捷列表并排 -->
+        <div v-else class="quick">
+          <section class="panel">
+            <div class="panel__head">
+              <span class="panel__title">最近查看</span>
+              <span class="panel__sub num">{{ recent.length }} 户</span>
+            </div>
+            <div class="panel__body">
+              <div v-if="!recent.length" class="quick__empty">
+                还没有查看记录。用上方搜索框查找企业,或从右侧重点税源中直接进入。
+              </div>
+              <StateBlock v-else :status="recentList.status.value" :error="recentList.error.value" @retry="loadRecent()">
+                <div v-if="recentList.data.value" class="qlist">
+                  <div
+                    v-for="t in recentList.data.value"
+                    :key="t.taxpayerId"
+                    class="qitem"
+                    @click="selectTaxpayer(t)"
+                  >
+                    <div class="qitem__main">
+                      <span class="qitem__name">{{ t.name }}</span>
+                      <span class="qitem__meta num">{{ t.industry }} · {{ t.district }}</span>
+                    </div>
+                    <BaseBadge :tone="RISK_TONE[t.riskLevel]">{{ RISK_LABEL[t.riskLevel] }}</BaseBadge>
+                  </div>
+                </div>
+              </StateBlock>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel__head">
+              <span class="panel__title">我管辖的重点税源</span>
+              <span v-if="keyList.data.value" class="panel__sub num">{{ keyList.data.value.length }} 户</span>
+            </div>
+            <div class="panel__body">
+              <StateBlock :status="keyList.status.value" :error="keyList.error.value" @retry="keyList.load()">
+                <div v-if="keyList.data.value" class="qlist">
+                  <div
+                    v-for="t in keyList.data.value"
+                    :key="t.taxpayerId"
+                    class="qitem"
+                    @click="selectTaxpayer(t)"
+                  >
+                    <div class="qitem__main">
+                      <span class="qitem__name">{{ t.name }}</span>
+                      <span class="qitem__meta num">
+                        本年入库 {{ money(t.yearTax) }} 万 · {{ t.industry }}
+                      </span>
+                    </div>
+                    <span class="qitem__score num" :class="`tone-${RISK_TONE[t.riskLevel]}`">
+                      {{ t.riskScore.toFixed(0) }}
+                    </span>
+                    <span v-if="t.openClueCount" class="qitem__clue num">{{ t.openClueCount }} 条未办结</span>
+                    <span v-else class="qitem__clue qitem__clue--none">无未办结</span>
+                  </div>
+                </div>
+              </StateBlock>
+            </div>
+          </section>
+        </div>
+      </template>
+
       <!-- ══ 企业概要卡 ══ -->
-      <section class="summary">
+      <section v-if="taxId" class="summary">
         <StateBlock :status="summary.status.value" :error="summary.error.value" @retry="summary.load()">
           <template v-if="summary.data.value">
             <div class="summary__inner">
@@ -140,7 +426,7 @@ const taxSum = computed(() => {
       </section>
 
       <!-- ══ 六大类标签页 ══ -->
-      <section class="panel">
+      <section v-if="taxId" class="panel">
         <TabNav v-model="tab" :tabs="TABS" />
 
         <div class="panel__body">
@@ -324,6 +610,228 @@ const taxSum = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+/* 可滚动的纵向 flex 容器:直接子项一律不收缩,避免面板被压扁 */
+.archive__body > * {
+  flex: none;
+}
+
+/* ══ 搜索区 ══ */
+.search {
+  background: var(--color-panel);
+  border: var(--border-line);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+}
+/* 空态下搜索区居中偏上,视觉上引导先检索 */
+.search--empty {
+  max-width: 860px;
+  width: 100%;
+  margin: var(--space-6) auto 0;
+}
+.search__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.search__row .btn {
+  height: 38px;
+  flex: none;
+}
+.search__row > .tps,
+.search__row :deep(.tps) {
+  flex: 1;
+  min-width: 0;
+}
+.search__count {
+  margin-left: 4px;
+  font-size: var(--fs-micro);
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: var(--radius-control);
+  padding: 0 5px;
+}
+.adv {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-neutral-200);
+}
+.adv__item {
+  min-width: 0;
+}
+.adv__item--wide {
+  grid-column: span 2;
+}
+.adv__item label {
+  display: block;
+  font-size: var(--fs-label);
+  color: var(--color-neutral-600);
+  margin-bottom: 4px;
+}
+.adv__act {
+  grid-column: span 5;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 已选中企业时的紧凑条 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-panel);
+  border: var(--border-line);
+  border-radius: var(--radius-control);
+  padding: 0 var(--space-4);
+  height: 46px;
+}
+.bar__label {
+  font-size: var(--fs-label);
+  color: var(--color-neutral-600);
+  flex: none;
+}
+.bar__name {
+  font-size: var(--fs-aux);
+  font-weight: var(--fw-semibold);
+  color: var(--color-neutral-900);
+}
+.bar__id {
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+  flex: 1;
+  min-width: 0;
+}
+.bar__btn {
+  height: 30px;
+  flex: none;
+}
+
+/* ══ 空态:检索结果与快捷列表 ══ */
+.quick {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: var(--space-4);
+  max-width: 1160px;
+  width: 100%;
+  margin: 0 auto;
+}
+.panel__head {
+  height: 42px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 18px;
+  border-bottom: var(--border-line);
+}
+.panel__title {
+  font-size: var(--fs-aux);
+  font-weight: var(--fw-semibold);
+}
+.panel__sub {
+  font-size: var(--fs-label);
+  color: var(--color-neutral-500);
+}
+.quick__empty {
+  font-size: var(--fs-label);
+  color: var(--color-neutral-500);
+  line-height: 1.8;
+  padding: var(--space-4) 0;
+  text-align: center;
+}
+.qlist {
+  display: flex;
+  flex-direction: column;
+}
+.qitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--color-neutral-200);
+  cursor: pointer;
+}
+.qitem:last-child {
+  border-bottom: none;
+}
+.qitem:hover {
+  background: var(--color-row-hover);
+}
+.qitem__main {
+  flex: 1;
+  min-width: 0;
+}
+.qitem__name {
+  display: block;
+  font-size: var(--fs-aux);
+  color: var(--color-neutral-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qitem__meta {
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+}
+.qitem__score {
+  flex: none;
+  width: 34px;
+  text-align: right;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  color: var(--tone-text);
+}
+.qitem__clue {
+  flex: none;
+  width: 76px;
+  text-align: right;
+  font-size: var(--fs-micro);
+  color: var(--color-risk-mid-text);
+}
+.qitem__clue--none {
+  color: var(--color-neutral-500);
+}
+
+.hits {
+  display: flex;
+  flex-direction: column;
+}
+.hit {
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--color-neutral-200);
+  cursor: pointer;
+}
+.hit:last-child {
+  border-bottom: none;
+}
+.hit:hover {
+  background: var(--color-row-hover);
+}
+.hit__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.hit__name {
+  font-size: var(--fs-aux);
+  color: var(--color-neutral-900);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hit__meta {
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+  margin-top: 1px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ══ 概要卡 ══ */

@@ -157,7 +157,11 @@ function toast(text: string) {
   toastVisible.value = true
 }
 function viewArchive() {
-  if (dv.value) router.push(`/archive?taxId=${encodeURIComponent(dv.value.taxId)}`)
+  if (dv.value) openArchive(dv.value.taxId)
+}
+/** 列表内纳税人名称 → 该户一户式档案(整行点击是切换高亮,故需阻止冒泡) */
+function openArchive(taxId: string) {
+  router.push(`/archive?taxpayerId=${encodeURIComponent(taxId)}`)
 }
 
 /* ---------------- 展示辅助 ---------------- */
@@ -332,6 +336,11 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
         >
           <template #cell-rank="{ row }">
             <span class="abn__rank">{{ row.rank }}</span>
+          </template>
+          <template #cell-taxpayerName="{ row }">
+            <span class="abn__tp" title="查看该户一户式档案" @click.stop="openArchive(row.taxId)">
+              {{ row.taxpayerName }}
+            </span>
           </template>
           <template #cell-score="{ row }">
             <div class="sc" :class="toneClass(RISK_TONE[row.level])">
@@ -595,6 +604,13 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
 }
 .abn__rank {
   color: var(--color-neutral-600);
+}
+.abn__tp {
+  cursor: pointer;
+}
+.abn__tp:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 .abn__link {
   color: var(--color-primary);

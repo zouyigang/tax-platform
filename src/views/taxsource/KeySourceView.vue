@@ -168,7 +168,11 @@ function toast(text: string) {
   toastVisible.value = true
 }
 function viewArchive() {
-  if (dt.value) router.push(`/archive?taxId=${encodeURIComponent(dt.value.taxId)}`)
+  if (dt.value) openArchive(dt.value.taxId)
+}
+/** 名录内纳税人名称 → 该户一户式档案(整行点击是进监控详情,故需阻止冒泡) */
+function openArchive(taxId: string) {
+  router.push(`/archive?taxpayerId=${encodeURIComponent(taxId)}`)
 }
 
 /* ---------------- 展示辅助 ---------------- */
@@ -328,7 +332,9 @@ const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 
           @row-click="openDetail"
         >
           <template #cell-name="{ row }">
-            <span class="ks__name">{{ row.name }}</span>
+            <span class="ks__name" title="查看该户一户式档案" @click.stop="openArchive(row.taxId)">
+              {{ row.name }}
+            </span>
             <span v-for="a in row.alerts" :key="a" class="ks__flag">!</span>
           </template>
           <template #cell-tier="{ row }">
@@ -572,6 +578,11 @@ const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 
 }
 .ks__name {
   color: var(--color-neutral-900);
+  cursor: pointer;
+}
+.ks__name:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 .ks__flag {
   color: var(--color-risk-high);

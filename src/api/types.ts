@@ -403,6 +403,92 @@ export interface ArchiveSummaryMetric {
   tone: Tone
 }
 
+/* ------------------------------------------------------------------------
+ * 纳税人检索(一户式主档查询的入口 + 全局顶栏搜索共用)
+ * 一户式档案的主体由 taxpayerId 确定,不再固定展示某一户;
+ * 因此检索能力属于档案模块的基础设施,而不是某个页面的私有逻辑。
+ * ---------------------------------------------------------------------- */
+
+/** 登记状态:正常 / 停业 / 注销 / 非正常 */
+export type TaxpayerRegStatus = 'active' | 'suspended' | 'cancelled' | 'abnormal'
+
+/** 纳税人资格:一般纳税人 / 小规模纳税人 */
+export type TaxpayerQualification = 'general' | 'small'
+
+/** 纳税人精简项(检索结果 / 联想下拉 / 快捷列表共用) */
+export interface TaxpayerBrief {
+  /** 纳税人主键(即纳税人识别号,URL 参数 taxpayerId 取此值) */
+  taxpayerId: string
+  /** 纳税人名称 */
+  name: string
+  /** 统一社会信用代码(脱敏) */
+  creditCode: string
+  /** 所属行业 */
+  industry: string
+  /** 行业编码 */
+  industryCode: string
+  /** 所属区县 */
+  district: string
+  /** 区县编码 */
+  districtCode: string
+  /** 主管税务机关 */
+  authority: string
+  /** 主管税务机关编码 */
+  authorityCode: string
+  /** 登记状态 */
+  regStatus: TaxpayerRegStatus
+  /** 纳税人资格 */
+  qualification: TaxpayerQualification
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 风险分(与风险评分模型同一口径) */
+  riskScore: number
+  /** 登记日期 */
+  registerDate: string
+}
+
+/** 「我管辖的重点税源」快捷项 */
+export interface KeyTaxpayerBrief extends TaxpayerBrief {
+  /** 未办结线索数 */
+  openClueCount: number
+  /** 本年累计入库(万元) */
+  yearTax: number
+}
+
+/** 纳税人检索·查询参数 */
+export interface TaxpayerQuery {
+  /** 关键词:名称 / 纳税人识别号 / 统一社会信用代码,模糊匹配 */
+  keyword: string
+  /** 行业编码;'all' 不限 */
+  industryCode: string
+  /** 登记状态;'all' 不限 */
+  regStatus: string
+  /** 主管税务机关编码;'all' 不限 */
+  authorityCode: string
+  /** 风险等级;'all' 不限 */
+  riskLevel: string
+  /** 纳税人资格;'all' 不限 */
+  qualification: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数(联想下拉传较小值) */
+  pageSize: number
+}
+
+/** 纳税人检索·筛选项 */
+export interface TaxpayerSearchFilters {
+  /** 行业选项(含「全部行业」) */
+  industries: FilterOption[]
+  /** 登记状态选项(含「全部状态」) */
+  regStatuses: FilterOption[]
+  /** 主管税务机关选项(含「全部机关」) */
+  authorities: FilterOption[]
+  /** 风险等级选项(含「全部等级」) */
+  riskLevels: FilterOption[]
+  /** 纳税人资格选项(含「全部资格」) */
+  qualifications: FilterOption[]
+}
+
 /** 档案概要卡 */
 export interface ArchiveSummary {
   /** 纳税人名称 */
@@ -523,6 +609,14 @@ export interface ArchiveApi {
   getArchiveInvoice(taxId: string): Promise<ArchiveInvoice>
   /** 征管评价标签页 */
   getArchiveEvaluation(taxId: string): Promise<ArchiveEvaluation>
+  /** 纳税人检索·高级筛选项 */
+  getTaxpayerSearchFilters(): Promise<TaxpayerSearchFilters>
+  /** 纳税人检索·按关键词与筛选条件分页查询(联想下拉传小 pageSize) */
+  searchTaxpayers(query: TaxpayerQuery): Promise<PagedResult<TaxpayerBrief>>
+  /** 按主键批量取纳税人精简项(前端「最近查看」存的是 id,由此还原) */
+  getTaxpayersByIds(ids: string[]): Promise<TaxpayerBrief[]>
+  /** 我管辖的重点税源快捷列表(含未办结线索数) */
+  getMyKeyTaxpayers(): Promise<KeyTaxpayerBrief[]>
 }
 
 /* ========================================================================
@@ -797,6 +891,11 @@ export interface GraphNode {
   risk: RiskLevel | null
   /** 是否核心节点(半径更大) */
   core: boolean
+  /**
+   * 该节点对应的纳税人主键;企业类节点下发,人员/资金账户类节点为空。
+   * 有值时前端可直接跳转其一户式档案,无值时只能按名称检索。
+   */
+  taxpayerId?: string
 }
 
 /** 图谱连线 */

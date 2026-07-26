@@ -16,6 +16,7 @@ import type {
   RuleStatus,
   RuleVerdict,
   SourceStatus,
+  TaxpayerRegStatus,
   Tone,
   TrialStatus,
 } from '@/api/types'
@@ -211,6 +212,22 @@ export const DOC_STATUS_TONE: Record<DocTaskStatus, ToneName> = {
   processing: 'primary',
   done: 'success',
   review: 'danger',
+}
+
+/** 纳税人登记状态 → 语气 */
+export const REG_STATUS_TONE: Record<TaxpayerRegStatus, ToneName> = {
+  active: 'success',
+  suspended: 'warn',
+  cancelled: 'neutral',
+  abnormal: 'danger',
+}
+
+/** 纳税人登记状态 → 展示文案 */
+export const REG_STATUS_LABEL: Record<TaxpayerRegStatus, string> = {
+  active: '正常',
+  suspended: '停业',
+  cancelled: '注销',
+  abnormal: '非正常',
 }
 
 /** 资料处理状态 → 展示文案 */

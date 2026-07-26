@@ -55,9 +55,18 @@ function toast(text: string) {
   toastText.value = text
   toastVisible.value = true
 }
+/**
+ * 查看档案:企业类节点带 taxpayerId,直接进该户档案;
+ * 人员 / 资金账户等节点没有纳税人主体,退化为按名称检索,不假装能定位到某一户。
+ */
 function viewArchive() {
-  router.push('/archive')
+  const n = selNode.value
+  if (!n) return
+  if (n.taxpayerId) router.push(`/archive?taxpayerId=${encodeURIComponent(n.taxpayerId)}`)
+  else router.push(`/archive?keyword=${encodeURIComponent(n.label)}`)
 }
+/** 当前选中节点是否可直接进档案(用于按钮文案) */
+const canViewArchive = computed(() => !!(selNode.value && selNode.value.taxpayerId))
 </script>
 
 <template>
@@ -134,7 +143,7 @@ function viewArchive() {
                   展开下级
                 </button>
                 <button type="button" class="btn btn--primary detail__btn" @click="viewArchive">
-                  查看档案
+                  {{ canViewArchive ? '查看档案' : '按名称检索' }}
                 </button>
               </div>
             </aside>

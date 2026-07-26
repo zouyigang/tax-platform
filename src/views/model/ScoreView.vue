@@ -178,7 +178,11 @@ function toast(text: string) {
   toastVisible.value = true
 }
 function gotoArchive() {
-  if (attr.value) router.push(`/archive?taxId=${encodeURIComponent(attr.value.taxId)}`)
+  if (attr.value) openArchive(attr.value.taxId)
+}
+/** 列表内纳税人名称 → 该户一户式档案(整行点击是打开归因,故需阻止冒泡) */
+function openArchive(taxId: string) {
+  router.push(`/archive?taxpayerId=${encodeURIComponent(taxId)}`)
 }
 
 /* ---------------- 表格 ---------------- */
@@ -368,7 +372,9 @@ const fmt = (n: number) => n.toLocaleString('en-US')
               <span class="score__rank">{{ row.rank }}</span>
             </template>
             <template #cell-taxpayerName="{ row }">
-              <span class="score__name">{{ row.taxpayerName }}</span>
+              <span class="score__name" title="查看该户一户式档案" @click.stop="openArchive(row.taxId)">
+                {{ row.taxpayerName }}
+              </span>
               <span v-if="row.hasClue" class="score__flag">已成线索</span>
             </template>
             <template #cell-score="{ row }">
@@ -653,6 +659,11 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 }
 .score__name {
   color: var(--color-neutral-900);
+  cursor: pointer;
+}
+.score__name:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 .score__flag {
   margin-left: var(--space-2);

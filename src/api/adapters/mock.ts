@@ -109,6 +109,7 @@ import type {
   KeySourceQuery,
   KeySourceRow,
   KeySourceStatus,
+  KeyTaxpayerBrief,
   KeyValue,
   KpiCard,
   MetricTrack,
@@ -147,6 +148,11 @@ import type {
   ShapItem,
   SourceContribution,
   TaxAdvice,
+  TaxpayerBrief,
+  TaxpayerQualification,
+  TaxpayerQuery,
+  TaxpayerRegStatus,
+  TaxpayerSearchFilters,
   TaxTypeStructure,
 } from '../types'
 
@@ -2264,6 +2270,66 @@ function buildNlAnswer(question: string): NlAnswer {
   }
 }
 
+/* ==================== 纳税人名录:一户式检索与全局搜索共用 ==================== */
+
+/** 登记状态 → 展示文案 */
+const TP_REG_LABEL: Record<TaxpayerRegStatus, string> = {
+  active: '正常',
+  suspended: '停业',
+  cancelled: '注销',
+  abnormal: '非正常',
+}
+
+/** 纳税人资格 → 展示文案 */
+const TP_QUAL_LABEL: Record<TaxpayerQualification, string> = {
+  general: '一般纳税人',
+  small: '小规模纳税人',
+}
+
+/** 主管税务机关(按区县设所) */
+const TP_AUTHORITY: Record<string, string> = {
+  chengdong: '城东区税务局第一税务所',
+  gaoxin: '高新区税务局第二税务所',
+  chengxi: '城西区税务局第一税务所',
+  jiangbei: '江北新区税务局第三税务所',
+  linjiang: '临江县税务局第一税务所',
+  yunling: '云岭县税务局第二税务所',
+}
+
+/**
+ * 纳税人名录
+ * 取自评分样本集全量 —— 与风险线索池、风险评分、团伙识别、重点税源各页是同一批主体。
+ * 覆盖全量而不是抽样,是为了保证站内任意一处点纳税人名称都能落到真实的一户,
+ * 不会因名录缺失而回落到另一家企业(那种「看起来能点」的错位比不能点更糟)。
+ */
+const TAXPAYER_DATA: TaxpayerBrief[] = SCORE_DATA.map((s, i) => {
+  const districtCode = DISTRICT_CODE_BY_CN[s.district] || 'chengdong'
+  // 状态分布:多数正常,少量停业/非正常/注销,便于演示状态筛选
+  const regStatus: TaxpayerRegStatus =
+    i % 13 === 5 ? 'suspended' : i % 17 === 9 ? 'abnormal' : i % 23 === 14 ? 'cancelled' : 'active'
+  return {
+    taxpayerId: s.taxId,
+    name: s.taxpayerName,
+    creditCode: `91${String(330100 + i)}${s.taxId.slice(-6)}`,
+    industry: s.industry,
+    industryCode: INDUSTRY_CODE_BY_CN[s.industry] || 'wholesale',
+    district: s.district,
+    districtCode,
+    authority: TP_AUTHORITY[districtCode],
+    authorityCode: districtCode,
+    regStatus,
+    qualification: (s.score > 55 || i % 3 === 0 ? 'general' : 'small') as TaxpayerQualification,
+    riskLevel: s.level,
+    riskScore: s.score,
+    registerDate: `20${14 + (i % 11)}-0${1 + (i % 9)}-${String(5 + (i % 22)).padStart(2, '0')}`,
+  }
+})
+
+/** 按主键取纳税人;查不到时回落到首户,避免详情页空白 */
+function taxpayerOf(id: string): TaxpayerBrief {
+  return TAXPAYER_DATA.filter((t) => t.taxpayerId === id)[0] || TAXPAYER_DATA[0]
+}
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -2586,45 +2652,52 @@ export const mockClient: ApiClient = {
 
   /* ==================== 一户式档案详情 ==================== */
   archive: {
-    getArchiveSummary(_taxId: string): Promise<ArchiveSummary> {
+    getArchiveSummary(taxId: string): Promise<ArchiveSummary> {
+      // 档案主体随 taxpayerId 变化,不再固定展示某一户
+      const t = taxpayerOf(taxId)
+      const openClues = CLUE_DATA.filter(
+        (c) => c.taxpayerName === t.name && (c.status === 'pending' || c.status === 'processing'),
+      ).length
+      const key = KEY_SOURCE_DATA.filter((k) => k.taxId === t.taxpayerId)[0]
       return delay({
-        taxpayerName: '城东区某建材经营部',
-        taxId: '91330100MA2****Q7X',
-        creditCode: '91330100MA2****Q7X',
-        authority: '城东区税务所',
-        avatarText: '城',
-        riskLevel: 'high',
-        registrationStatus: '在营',
+        taxpayerName: t.name,
+        taxId: t.taxpayerId,
+        creditCode: t.creditCode,
+        authority: t.authority,
+        avatarText: t.name.slice(0, 1),
+        riskLevel: t.riskLevel,
+        registrationStatus: TP_REG_LABEL[t.regStatus],
         metrics: [
-          { label: '风险评分', value: '82', tone: 'danger' },
-          { label: '未办结线索', value: '2', tone: 'warn' },
-          { label: '年入库(万)', value: '128.6', tone: 'default' },
-          { label: '信用等级', value: 'B', tone: 'gold' },
+          { label: '风险评分', value: t.riskScore.toFixed(0), tone: t.riskLevel === 'high' ? 'danger' : t.riskLevel === 'mid' ? 'warn' : 'gold' },
+          { label: '未办结线索', value: String(openClues), tone: openClues ? 'warn' : 'default' },
+          { label: '年入库(万)', value: key ? money(key.yearTax) : '—', tone: 'default' },
+          { label: '信用等级', value: t.riskScore >= 80 ? 'C' : t.riskScore >= 60 ? 'B' : 'A', tone: 'gold' },
         ],
       })
     },
 
-    getArchiveProfile(_taxId: string, section: 'base' | 'reg' | 'biz'): Promise<KeyValue[]> {
+    getArchiveProfile(taxId: string, section: 'base' | 'reg' | 'biz'): Promise<KeyValue[]> {
+      const t = taxpayerOf(taxId)
       const map: Record<'base' | 'reg' | 'biz', KeyValue[]> = {
         base: [
-          { key: '纳税人名称', value: '城东区某建材经营部', numeric: false },
-          { key: '统一社会信用代码', value: '91330100MA2****Q7X', numeric: true },
-          { key: '纳税人识别号', value: '91330100MA2****Q7X', numeric: true },
+          { key: '纳税人名称', value: t.name, numeric: false },
+          { key: '统一社会信用代码', value: t.creditCode, numeric: true },
+          { key: '纳税人识别号', value: t.taxpayerId, numeric: true },
           { key: '法定代表人', value: '张××', numeric: false },
           { key: '注册资本', value: '500 万元', numeric: false },
-          { key: '成立日期', value: '2016-03-18', numeric: true },
+          { key: '成立日期', value: t.registerDate, numeric: true },
           { key: '联系电话', value: '0000-8888****', numeric: true },
-          { key: '注册地址', value: '城东区工业大道 XX 号', numeric: false },
-          { key: '经营地址', value: '城东区工业大道 XX 号', numeric: false },
+          { key: '注册地址', value: `${t.district}工业大道 XX 号`, numeric: false },
+          { key: '经营地址', value: `${t.district}工业大道 XX 号`, numeric: false },
         ],
         reg: [
           { key: '登记注册类型', value: '有限责任公司', numeric: false },
-          { key: '所属行业', value: '批发和零售业 / 建材', numeric: false },
-          { key: '主管税务所', value: '城东区税务所', numeric: false },
-          { key: '税务登记日期', value: '2016-03-25', numeric: true },
-          { key: '登记状态', value: '正常', numeric: false },
-          { key: '一般纳税人资格', value: '是', numeric: false },
-          { key: '资格认定日期', value: '2016-06-01', numeric: true },
+          { key: '所属行业', value: t.industry, numeric: false },
+          { key: '主管税务所', value: t.authority, numeric: false },
+          { key: '税务登记日期', value: t.registerDate, numeric: true },
+          { key: '登记状态', value: TP_REG_LABEL[t.regStatus], numeric: false },
+          { key: '纳税人资格', value: TP_QUAL_LABEL[t.qualification], numeric: false },
+          { key: '资格认定日期', value: t.registerDate, numeric: true },
           { key: '财务负责人', value: '李××', numeric: false },
           { key: '办税人员', value: '王××', numeric: false },
         ],
@@ -2709,6 +2782,84 @@ export const mockClient: ApiClient = {
           { label: '欠税/滞纳记录', value: '无', tone: 'success' },
         ],
       })
+    },
+
+    getTaxpayerSearchFilters(): Promise<TaxpayerSearchFilters> {
+      return delay({
+        industries: [{ value: 'all', label: '全部行业' }].concat(
+          INDUSTRY_CODES.map((c) => ({ value: c, label: INDUSTRY_CN[c] })),
+        ),
+        regStatuses: [{ value: 'all', label: '全部状态' }].concat(
+          (Object.keys(TP_REG_LABEL) as TaxpayerRegStatus[]).map((k) => ({ value: k, label: TP_REG_LABEL[k] })),
+        ),
+        authorities: [{ value: 'all', label: '全部机关' }].concat(
+          Object.keys(TP_AUTHORITY).map((k) => ({ value: k, label: TP_AUTHORITY[k] })),
+        ),
+        riskLevels: [
+          { value: 'all', label: '全部等级' },
+          { value: 'high', label: '高风险' },
+          { value: 'mid', label: '中风险' },
+          { value: 'low', label: '低风险' },
+        ],
+        qualifications: [{ value: 'all', label: '全部资格' }].concat(
+          (Object.keys(TP_QUAL_LABEL) as TaxpayerQualification[]).map((k) => ({ value: k, label: TP_QUAL_LABEL[k] })),
+        ),
+      })
+    },
+
+    searchTaxpayers(query: TaxpayerQuery): Promise<PagedResult<TaxpayerBrief>> {
+      const kw = query.keyword.trim().toUpperCase()
+      const filtered = TAXPAYER_DATA.filter((t) => {
+        // 关键词同时匹配名称、纳税人识别号与统一社会信用代码
+        if (kw && t.name.toUpperCase().indexOf(kw) < 0 && t.taxpayerId.toUpperCase().indexOf(kw) < 0 && t.creditCode.toUpperCase().indexOf(kw) < 0) {
+          return false
+        }
+        if (query.industryCode !== 'all' && t.industryCode !== query.industryCode) return false
+        if (query.regStatus !== 'all' && t.regStatus !== query.regStatus) return false
+        if (query.authorityCode !== 'all' && t.authorityCode !== query.authorityCode) return false
+        if (query.riskLevel !== 'all' && t.riskLevel !== query.riskLevel) return false
+        if (query.qualification !== 'all' && t.qualification !== query.qualification) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      // 联想下拉响应要快,故此接口延时短于常规取数
+      return delay(
+        {
+          items: filtered.slice(start, start + query.pageSize),
+          total: filtered.length,
+          page: query.page,
+          pageSize: query.pageSize,
+        },
+        180,
+      )
+    },
+
+    getTaxpayersByIds(ids: string[]): Promise<TaxpayerBrief[]> {
+      // 按传入顺序返回(最近查看要保持时间顺序),查不到的直接跳过
+      const out: TaxpayerBrief[] = []
+      ids.forEach((id) => {
+        const hit = TAXPAYER_DATA.filter((t) => t.taxpayerId === id)[0]
+        if (hit) out.push(hit)
+      })
+      return delay(out, 160)
+    },
+
+    getMyKeyTaxpayers(): Promise<KeyTaxpayerBrief[]> {
+      // 取风险分最高的 10 户作为「我管辖的重点税源」
+      const list = TAXPAYER_DATA.slice()
+        .sort((a, b) => b.riskScore - a.riskScore)
+        .slice(0, 10)
+        .map((t) => {
+          const key = KEY_SOURCE_DATA.filter((k) => k.taxId === t.taxpayerId)[0]
+          return {
+            ...t,
+            openClueCount: CLUE_DATA.filter(
+              (c) => c.taxpayerName === t.name && (c.status === 'pending' || c.status === 'processing'),
+            ).length,
+            yearTax: key ? key.yearTax : +(t.riskScore * 42).toFixed(1),
+          }
+        })
+      return delay(list)
     },
   },
 
@@ -3724,17 +3875,22 @@ export const mockClient: ApiClient = {
   /* ==================== 智能模型 · 关联图谱分析 ==================== */
   graph: {
     getGraph(_rootId: string): Promise<GraphData> {
+      /** 企业类节点按名称关联到纳税人名录,便于从图谱直接进其一户式档案 */
+      const tpIdOf = (name: string) => {
+        const hit = TAXPAYER_DATA.filter((t) => t.name === name)[0]
+        return hit ? hit.taxpayerId : undefined
+      }
       const nodes: GraphData['nodes'] = [
-        { id: 'n1', label: '城东区某建材经营部', type: 'ent', x: 440, y: 310, risk: 'high', core: true },
+        { id: 'n1', label: '城东区某建材经营部', type: 'ent', x: 440, y: 310, risk: 'high', core: true, taxpayerId: tpIdOf('城东区某建材经营部') },
         { id: 'n2', label: '张××', type: 'person', x: 230, y: 170, risk: null, core: false },
-        { id: 'n3', label: '城西区某商贸公司', type: 'ent', x: 210, y: 400, risk: 'high', core: false },
-        { id: 'n4', label: '临江县某科技公司', type: 'ent', x: 120, y: 280, risk: 'mid', core: false },
+        { id: 'n3', label: '城西区某商贸公司', type: 'ent', x: 210, y: 400, risk: 'high', core: false, taxpayerId: tpIdOf('城西区某商贸有限公司') },
+        { id: 'n4', label: '临江县某科技公司', type: 'ent', x: 120, y: 280, risk: 'mid', core: false, taxpayerId: tpIdOf('临江县某科技有限公司') },
         { id: 'n5', label: '李××', type: 'person', x: 470, y: 120, risk: null, core: false },
         { id: 'n6', label: '王××', type: 'person', x: 660, y: 150, risk: null, core: false },
         { id: 'n7', label: '某对公账户', type: 'fund', x: 700, y: 330, risk: null, core: false },
         { id: 'n8', label: '受票方 A 公司', type: 'invoice', x: 640, y: 470, risk: null, core: false },
         { id: 'n9', label: '受票方 B 公司', type: 'invoice', x: 420, y: 520, risk: null, core: false },
-        { id: 'n10', label: '高新区某餐饮公司', type: 'ent', x: 180, y: 520, risk: 'mid', core: false },
+        { id: 'n10', label: '高新区某餐饮公司', type: 'ent', x: 180, y: 520, risk: 'mid', core: false, taxpayerId: tpIdOf('高新区某餐饮管理公司') },
       ]
       const edges: GraphData['edges'] = [
         { source: 'n1', target: 'n2', label: '法定代表人', strong: true },

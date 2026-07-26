@@ -73,6 +73,7 @@ import type {
   KeySourceFilters,
   KeySourceQuery,
   KeySourceRow,
+  KeyTaxpayerBrief,
   KeyValue,
   KpiCard,
   NewEntDetail,
@@ -97,6 +98,9 @@ import type {
   ScoreQuery,
   ScoreRow,
   SourceContribution,
+  TaxpayerBrief,
+  TaxpayerQuery,
+  TaxpayerSearchFilters,
   TaxTypeStructure,
 } from '../types'
 
@@ -215,6 +219,28 @@ export const httpClient: ApiClient = {
     },
     getArchiveEvaluation(taxId: string): Promise<ArchiveEvaluation> {
       return get<ArchiveEvaluation>(`/archive/${encodeURIComponent(taxId)}/evaluation`)
+    },
+    getTaxpayerSearchFilters(): Promise<TaxpayerSearchFilters> {
+      return get<TaxpayerSearchFilters>('/taxpayers/filters')
+    },
+    searchTaxpayers(query: TaxpayerQuery): Promise<PagedResult<TaxpayerBrief>> {
+      return get<PagedResult<TaxpayerBrief>>('/taxpayers', {
+        keyword: query.keyword,
+        industryCode: query.industryCode,
+        regStatus: query.regStatus,
+        authorityCode: query.authorityCode,
+        riskLevel: query.riskLevel,
+        qualification: query.qualification,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getTaxpayersByIds(ids: string[]): Promise<TaxpayerBrief[]> {
+      // 主键以逗号分隔传递,后端需按传入顺序返回
+      return get<TaxpayerBrief[]>('/taxpayers/by-ids', { ids: ids.join(',') })
+    },
+    getMyKeyTaxpayers(): Promise<KeyTaxpayerBrief[]> {
+      return get<KeyTaxpayerBrief[]>('/taxpayers/my-key-sources')
     },
   },
 

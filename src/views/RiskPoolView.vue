@@ -138,6 +138,11 @@ function openWorkbench(row: ClueRow) {
   router.push(`/clues/${row.id}`)
 }
 
+/** 纳税人名称 → 该户一户式档案(与整行点击的目的地不同,故需阻止冒泡) */
+function openArchive(row: ClueRow) {
+  router.push(`/archive?taxpayerId=${encodeURIComponent(row.taxId)}`)
+}
+
 /* 派发确认(《交互说明》4.3) */
 const dispatchOpen = ref(false)
 const dispatchRow = ref<ClueRow | null>(null)
@@ -300,6 +305,11 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
           <template #cell-id="{ row }">
             <span class="pool__id">{{ row.id }}</span>
           </template>
+          <template #cell-taxpayerName="{ row }">
+            <span class="pool__tp" title="查看该户一户式档案" @click.stop="openArchive(row)">
+              {{ row.taxpayerName }}
+            </span>
+          </template>
           <template #cell-riskLevel="{ row }">
             <BaseBadge :tone="RISK_TONE[row.riskLevel]">{{ RISK_LABEL[row.riskLevel] }}</BaseBadge>
           </template>
@@ -449,6 +459,14 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
 .pool__id {
   color: var(--color-primary);
   font-weight: var(--fw-medium);
+}
+/* 纳税人名称可点:跳该户档案 */
+.pool__tp {
+  cursor: pointer;
+}
+.pool__tp:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
 .pool__link {
   color: var(--color-primary);

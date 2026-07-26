@@ -36,6 +36,12 @@ function loadAll() {
 onMounted(loadAll)
 watch(clueId, loadAll)
 
+/** 概览卡 → 该户一户式档案 */
+function openArchive() {
+  const d = detail.data.value
+  if (d) router.push(`/archive?taxpayerId=${encodeURIComponent(d.taxId)}`)
+}
+
 /* ---------------- 二次确认 + toast ---------------- */
 const toastVisible = ref(false)
 const toastText = ref('')
@@ -99,7 +105,10 @@ function backToPool() {
                   {{ RISK_LABEL[detail.data.value.riskLevel] }}
                 </BaseBadge>
               </div>
-              <div class="wb__ov-name">{{ detail.data.value.taxpayerName }}</div>
+              <div class="wb__ov-name">
+                {{ detail.data.value.taxpayerName }}
+                <button type="button" class="btn wb__ov-archive" @click="openArchive">查看完整档案</button>
+              </div>
               <div class="wb__ov-meta num">识别号 {{ detail.data.value.taxId }}</div>
             </div>
             <div class="wb__ov-metrics">
@@ -301,6 +310,15 @@ function backToPool() {
   font-size: var(--fs-h2);
   font-weight: var(--fw-semibold);
   margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.wb__ov-archive {
+  height: 26px;
+  padding: 0 10px;
+  font-size: var(--fs-label);
+  font-weight: var(--fw-regular);
 }
 .wb__ov-meta {
   font-size: var(--fs-label);
