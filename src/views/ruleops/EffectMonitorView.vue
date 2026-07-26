@@ -179,6 +179,7 @@ function rateTone(r: number) {
   gap: var(--space-4);
 }
 .em__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);

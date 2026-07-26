@@ -396,6 +396,7 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
   gap: var(--space-3);
 }
 .abn__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
@@ -417,6 +418,7 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
 
 /* ---------- 图区 ---------- */
 .abn__row {
+  flex: none;
   display: grid;
   grid-template-columns: 1fr 330px;
   gap: var(--space-4);

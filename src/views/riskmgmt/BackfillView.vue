@@ -314,6 +314,7 @@ const total = computed(() => (list.data.value ? list.data.value.total : 0))
   position: relative;
 }
 .bf__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);

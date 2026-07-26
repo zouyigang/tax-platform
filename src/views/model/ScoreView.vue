@@ -523,6 +523,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 
 /* ---------- 模型态 ---------- */
 .score__model {
+  flex: none;
   display: grid;
   /* 第三列(特征清单)最宽:名称列占位大,条形需要留出可读长度 */
   grid-template-columns: 1fr 1.15fr 1.2fr;
@@ -581,6 +582,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 
 /* ---------- 结果态 ---------- */
 .score__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);

@@ -446,6 +446,7 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 
   gap: var(--space-3);
 }
 .gang__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
@@ -581,6 +582,7 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 
 
 /* ---------- 下钻 ---------- */
 .gang__drill {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -620,6 +622,7 @@ const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 
 }
 
 .gang__drill-row {
+  flex: none;
   display: grid;
   grid-template-columns: 1fr 330px;
   gap: var(--space-4);

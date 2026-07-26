@@ -245,6 +245,7 @@ const currentStat = computed(() => items.value.filter((i) => i.industryCode === 
       <PanelCard
         title="基准值表"
         :subtitle="bd ? `${bd.metric.name} · 单位 ${bd.metric.unit}` : ''"
+        class="bm__table"
       >
         <StateBlock :status="board.status.value" :error="board.error.value" @retry="board.load()">
           <DataTable
@@ -369,6 +370,7 @@ const currentStat = computed(() => items.value.filter((i) => i.industryCode === 
   gap: var(--space-3);
 }
 .bm__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
@@ -380,6 +382,11 @@ const currentStat = computed(() => items.value.filter((i) => i.industryCode === 
 .bm__scatter {
   flex: none;
   height: 372px;
+}
+/* PanelCard 自带 min-height:0,在可滚动的纵向 flex 容器里会被压扁到只剩标题栏,
+   故所有直接子项都显式 flex:none,由内容决定高度、由 body 统一滚动 */
+.bm__table {
+  flex: none;
 }
 .bm__box :deep(.panel-card__body),
 .bm__scatter :deep(.panel-card__body) {

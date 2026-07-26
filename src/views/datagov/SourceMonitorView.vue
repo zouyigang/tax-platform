@@ -146,6 +146,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
   gap: var(--space-4);
 }
 .sm__kpis {
+  flex: none;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-4);
