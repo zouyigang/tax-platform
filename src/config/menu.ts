@@ -26,8 +26,11 @@ export interface MenuLeaf {
   status: 'done' | 'placeholder'
   /** 功能说明(占位页展示,可多条) */
   desc?: string[]
-  /** 红色角标(如待处置数量),可空 */
-  badge?: string
+  /**
+   * 动态角标的数据键;有值时由侧栏按此键取数并渲染角标。
+   * 不提供静态角标 —— 写死的数字必然与列表实际条数脱节。
+   */
+  badgeKey?: 'clue-pending'
 }
 
 /** 菜单分组节点(一级容器,仅折叠展开,不承载路由) */
@@ -99,8 +102,9 @@ export const MENU: MenuEntry[] = [
         title: '风险线索池',
         path: '/risk-pool',
         status: 'done',
-        // 全局待处置线索数,本轮沿用设计稿静态值 137
-        badge: '137',
+        // 角标不写死:由侧栏调 clues.getCluePendingCount() 取「待派发」线索数,
+        // 与线索池列表同源,避免菜单显示 137 而列表只有 24 条这类对不上的情况
+        badgeKey: 'clue-pending',
       },
       {
         key: 'risk-dispatch',

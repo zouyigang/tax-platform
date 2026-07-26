@@ -135,7 +135,7 @@ const hasSelection = computed(() => selectedKeys.value.length > 0)
 
 /** 进入核查处置工作台整页 */
 function openWorkbench(row: ClueRow) {
-  router.push(`/clues/${row.id}`)
+  router.push({ path: '/clues', query: { taskId: row.id } })
 }
 
 /** 纳税人名称 → 该户一户式档案(与整行点击的目的地不同,故需阻止冒泡) */

@@ -375,6 +375,54 @@ export interface ClueDisposalOptions {
 }
 
 /** 风险线索工作台接口分组 */
+/* ------------------------------------------------------------------------
+ * 我的待办任务(核查处置工作台的空态)
+ * 风险线索池是管理者视角(全局线索、批量派发),
+ * 核查处置工作台是办理人视角(只看派给我的、按时限催着办)。
+ * 因此这里不复用线索列表接口:口径不同(只含本人承办)、排序不同(按剩余时限)。
+ * ---------------------------------------------------------------------- */
+
+/** 待办任务状态:待处理 / 处置中 / 待回填 / 已超期 */
+export type MyTaskStatus = 'pending' | 'processing' | 'backfill' | 'overdue'
+
+/** 我的待办任务行 */
+export interface MyTaskRow {
+  /** 任务编号 */
+  taskId: string
+  /** 关联线索编号 */
+  clueId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 纳税人识别号 */
+  taxId: string
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 预估税款(万元) */
+  estimatedTax: number
+  /** 规则类别 */
+  category: string
+  /** 命中规则数 */
+  hitRuleCount: number
+  /** 派发时间 */
+  dispatchedAt: string
+  /** 办理时限 */
+  dueDate: string
+  /** 剩余天数;0 为今日到期,负数为已超期 */
+  remainDays: number
+  /** 任务状态 */
+  status: MyTaskStatus
+}
+
+/** 我的待办·概览 */
+export interface MyTaskSummary {
+  /** 当前办理人 */
+  assignee: string
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 状态标签及数量 */
+  statuses: Array<FilterOption & { count: number }>
+}
+
 export interface CluesApi {
   /** 顶部筛选条选项 + 各风险等级计数 */
   getClueFilters(): Promise<ClueFilters>
@@ -384,6 +432,15 @@ export interface CluesApi {
   getClueDetail(id: string): Promise<ClueDetail>
   /** 结果回填表单的选项集（核查结论 / 问题类型 / 税种 / 误报原因） */
   getClueDisposalOptions(): Promise<ClueDisposalOptions>
+  /** 我的待办·状态标签与数量 */
+  getMyTaskSummary(): Promise<MyTaskSummary>
+  /** 我的待办·任务列表(按剩余时限升序,超期置顶);status 传 'all' 不过滤 */
+  getMyTasks(status: string): Promise<MyTaskRow[]>
+  /**
+   * 全局待派发线索数(侧栏角标取此值)
+   * 单列一个轻量接口,避免侧栏为了一个数字去拉整份筛选项。
+   */
+  getCluePendingCount(): Promise<number>
 }
 
 /* ========================================================================
@@ -1806,6 +1863,79 @@ export interface DispatchFilters {
   assignees: FilterOption[]
 }
 
+/* ------------------------------------------------------------------------
+ * 任务派发 · 派发策略配置
+ * 线索池已承担单条与批量派发(管理者手工挑),本页解决的是「怎么自动分」:
+ * 先配规则与权重,再看人员负荷,最后按策略批量试算 —— 试算结果确认后才执行。
+ * ---------------------------------------------------------------------- */
+
+/** 派发规则键:按管辖分局 / 按行业专业化分工 / 按人员当前负荷 */
+export type DispatchRuleKey = 'district' | 'industry' | 'workload'
+
+/** 一条自动派发规则 */
+export interface DispatchRule {
+  /** 规则键 */
+  key: DispatchRuleKey
+  /** 规则名称 */
+  name: string
+  /** 规则说明 */
+  desc: string
+  /** 是否启用 */
+  enabled: boolean
+  /** 权重(0–100,启用规则的权重之和参与归一) */
+  weight: number
+  /** 优先级(数字越小越先适用) */
+  priority: number
+}
+
+/** 派发策略 */
+export interface DispatchStrategy {
+  /** 策略最后更新时间 */
+  updatedAt: string
+  /** 最后修改人 */
+  updatedBy: string
+  /** 规则列表(按优先级升序) */
+  rules: DispatchRule[]
+  /** 策略适用说明 */
+  note: string
+}
+
+/** 策略保存 / 试算入参 */
+export interface DispatchStrategyInput {
+  /** 各规则的启用状态、权重与优先级 */
+  rules: Array<{ key: DispatchRuleKey; enabled: boolean; weight: number; priority: number }>
+}
+
+/** 自动派发试算·一条分派结果 */
+export interface DispatchPreviewItem {
+  /** 线索编号 */
+  clueId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 风险等级 */
+  riskLevel: RiskLevel
+  /** 预估税款(万元) */
+  estimatedTax: number
+  /** 拟派承办人 */
+  assignee: string
+  /** 承办人所属分局 */
+  dept: string
+  /** 命中的分派依据(说明为什么派给他) */
+  reason: string
+  /** 派发后该承办人的负荷率(百分数) */
+  loadAfter: number
+}
+
+/** 自动派发试算结果 */
+export interface DispatchPreview {
+  /** 拟分派明细 */
+  items: DispatchPreviewItem[]
+  /** 未能分派的线索及原因(如全员超载),不静默丢弃 */
+  unassigned: Array<{ clueId: string; taxpayerName: string; reason: string }>
+  /** 派发后的人员负荷(用于与派发前对比) */
+  loadAfter: WorkloadRow[]
+}
+
 /** 任务派发·概览 */
 export interface DispatchBoard {
   /** 顶部指标 */
@@ -1901,6 +2031,10 @@ export interface RiskMgmtApi {
   getDispatchBoard(): Promise<DispatchBoard>
   /** 任务派发·待派发线索列表 */
   getDispatchList(query: DispatchQuery): Promise<PagedResult<DispatchRow>>
+  /** 任务派发·自动派发策略 */
+  getDispatchStrategy(): Promise<DispatchStrategy>
+  /** 任务派发·按策略试算分派结果(执行前预览,不落库) */
+  previewAutoDispatch(input: DispatchStrategyInput): Promise<DispatchPreview>
   /** 结果回填·筛选项与概览 */
   getBackfillFilters(): Promise<BackfillFilters>
   /** 结果回填·任务列表 */

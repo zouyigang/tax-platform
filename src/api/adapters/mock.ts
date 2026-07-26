@@ -60,8 +60,13 @@ import type {
   DataSourceMonitor,
   DispatchBoard,
   DispatchFilters,
+  DispatchPreview,
+  DispatchPreviewItem,
   DispatchQuery,
   DispatchRow,
+  DispatchRule,
+  DispatchStrategy,
+  DispatchStrategyInput,
   EffectMonitor,
   PerformanceStats,
   ThresholdFilters,
@@ -113,6 +118,9 @@ import type {
   KeyValue,
   KpiCard,
   MetricTrack,
+  MyTaskRow,
+  MyTaskStatus,
+  MyTaskSummary,
   NamedValue,
   NewEntDetail,
   NewEntFilters,
@@ -148,6 +156,7 @@ import type {
   ShapItem,
   SourceContribution,
   TaxAdvice,
+  WorkloadRow,
   TaxpayerBrief,
   TaxpayerQualification,
   TaxpayerQuery,
@@ -2330,6 +2339,194 @@ function taxpayerOf(id: string): TaxpayerBrief {
   return TAXPAYER_DATA.filter((t) => t.taxpayerId === id)[0] || TAXPAYER_DATA[0]
 }
 
+/* ==================== 风险管理:我的待办 / 派发策略演示数据 ==================== */
+
+/** 当前登录的办理人(演示固定一人) */
+const MY_ASSIGNEE = '李××'
+
+/**
+ * 我的待办任务
+ * 与线索池同源于 CLUE_DATA,但口径不同:只取已派发给本人、尚未办结的线索。
+ * 状态映射:线索 pending→待处理、processing→处置中;
+ * 处置完成待回填的另行标记;剩余时限为负即已超期。
+ */
+const MY_TASK_DATA: MyTaskRow[] = CLUE_DATA.filter((c) => c.status === 'pending' || c.status === 'processing').map(
+  (c, i) => {
+    // 派发时间取线索生成日次日,时限按风险等级给 5/10/15 天
+    const limitDays = c.riskLevel === 'high' ? 5 : c.riskLevel === 'mid' ? 10 : 15
+    const dispatched = new Date(`${c.createdDate}T00:00:00`)
+    dispatched.setDate(dispatched.getDate() + 1)
+    const due = new Date(dispatched)
+    due.setDate(due.getDate() + limitDays)
+    const today = new Date('2026-07-24T00:00:00')
+    const remainDays = Math.round((due.getTime() - today.getTime()) / 86400000)
+    const fmtDate = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    // 处置中的任务里,每 3 条有 1 条已完成核查、只差回填
+    const status: MyTaskStatus =
+      remainDays < 0 ? 'overdue' : c.status === 'processing' && i % 3 === 1 ? 'backfill' : c.status === 'processing' ? 'processing' : 'pending'
+    return {
+      taskId: `RW2026-${String(5100 + i)}`,
+      clueId: c.id,
+      taxpayerName: c.taxpayerName,
+      taxId: c.taxId,
+      riskLevel: c.riskLevel,
+      estimatedTax: c.estimatedTax,
+      category: CAT_LABEL[c.categoryCode] || c.categoryCode,
+      hitRuleCount: c.hitRuleCount,
+      dispatchedAt: fmtDate(dispatched),
+      dueDate: fmtDate(due),
+      remainDays,
+      status,
+    }
+  },
+)
+
+/** 排序:超期置顶,其余按剩余时限升序 */
+const MY_TASK_SORTED: MyTaskRow[] = MY_TASK_DATA.slice().sort((a, b) => a.remainDays - b.remainDays)
+
+/** 自动派发规则(默认策略) */
+const DISPATCH_RULES: DispatchRule[] = [
+  {
+    key: 'district',
+    name: '按管辖分局',
+    desc: '线索所属区县优先派给该区县税务局的承办人,跨区不派',
+    enabled: true,
+    weight: 45,
+    priority: 1,
+  },
+  {
+    key: 'industry',
+    name: '按行业专业化分工',
+    desc: '按承办人擅长行业匹配,建筑安装、房地产等专业性强的行业优先匹配',
+    enabled: true,
+    weight: 30,
+    priority: 2,
+  },
+  {
+    key: 'workload',
+    name: '按人员当前负荷',
+    desc: '在办任务数接近承载上限的人员不再派单,负荷低者优先',
+    enabled: true,
+    weight: 25,
+    priority: 3,
+  },
+]
+
+/** 人员负荷(派发看板与试算共用) */
+const WORKLOAD_DATA: WorkloadRow[] = [
+  { name: '王××', dept: '城东区税务局', processing: 7, done: 12, capacity: 8, loadRate: 88 },
+  { name: '李××', dept: '城东区税务局', processing: 4, done: 15, capacity: 8, loadRate: 50 },
+  { name: '张××', dept: '高新区税务局', processing: 9, done: 10, capacity: 8, loadRate: 113 },
+  { name: '陈××', dept: '高新区税务局', processing: 3, done: 14, capacity: 8, loadRate: 38 },
+  { name: '赵××', dept: '城西区税务局', processing: 6, done: 11, capacity: 8, loadRate: 75 },
+  { name: '孙××', dept: '城西区税务局', processing: 2, done: 9, capacity: 8, loadRate: 25 },
+  { name: '周××', dept: '江北新区税务局', processing: 5, done: 13, capacity: 8, loadRate: 63 },
+  { name: '吴××', dept: '临江县税务局', processing: 3, done: 8, capacity: 8, loadRate: 38 },
+  { name: '郑××', dept: '云岭县税务局', processing: 1, done: 7, capacity: 8, loadRate: 13 },
+]
+
+/** 区县名 → 承办人所属分局名 */
+const DEPT_OF_DISTRICT: Record<string, string> = {
+  '城东区': '城东区税务局',
+  '高新区': '高新区税务局',
+  '城西区': '城西区税务局',
+  '江北新区': '江北新区税务局',
+  '临江县': '临江县税务局',
+  '云岭县': '云岭县税务局',
+}
+
+/** 承办人擅长行业(行业专业化分工用) */
+const ASSIGNEE_INDUSTRY: Record<string, string> = {
+  // 键含「×」不是合法标识符字符,必须加引号
+  '王××': '批发零售',
+  '李××': '建筑安装',
+  '张××': '制造业',
+  '陈××': '房地产',
+  '赵××': '商务服务',
+  '孙××': '交通运输',
+  '周××': '制造业',
+  '吴××': '批发零售',
+  '郑××': '建筑安装',
+}
+
+/** 按策略试算分派结果 */
+function buildDispatchPreview(input: DispatchStrategyInput): DispatchPreview {
+  const enabled = input.rules.filter((r) => r.enabled).sort((a, b) => a.priority - b.priority)
+  const useDistrict = enabled.some((r) => r.key === 'district')
+  const useIndustry = enabled.some((r) => r.key === 'industry')
+  const useWorkload = enabled.some((r) => r.key === 'workload')
+
+  // 负荷在试算过程中逐条累加,后面的线索能看到前面已派的影响
+  const load: Record<string, number> = {}
+  WORKLOAD_DATA.forEach((w) => (load[w.name] = w.processing))
+  const capacityOf = (name: string) => (WORKLOAD_DATA.filter((w) => w.name === name)[0] || WORKLOAD_DATA[0]).capacity
+  const deptOf = (name: string) => (WORKLOAD_DATA.filter((w) => w.name === name)[0] || WORKLOAD_DATA[0]).dept
+
+  const pending = CLUE_DATA.filter((c) => c.status === 'pending')
+  const items: DispatchPreviewItem[] = []
+  const unassigned: DispatchPreview['unassigned'] = []
+
+  pending.forEach((c) => {
+    const districtName = DISTRICT_CN[c.districtCode] || ''
+    const dept = DEPT_OF_DISTRICT[districtName] || ''
+    const industry = (TAXPAYER_DATA.filter((t) => t.name === c.taxpayerName)[0] || { industry: '' }).industry
+
+    let pool = WORKLOAD_DATA.map((w) => w.name)
+    const reasons: string[] = []
+    if (useDistrict && dept) {
+      const inDept = pool.filter((n) => deptOf(n) === dept)
+      if (inDept.length) {
+        pool = inDept
+        reasons.push(`管辖分局匹配 ${dept}`)
+      }
+    }
+    if (useIndustry && industry) {
+      const matched = pool.filter((n) => ASSIGNEE_INDUSTRY[n] === industry)
+      if (matched.length) {
+        pool = matched
+        reasons.push(`行业专业化匹配 ${industry}`)
+      }
+    }
+    if (useWorkload) {
+      const free = pool.filter((n) => load[n] < capacityOf(n))
+      if (free.length) {
+        pool = free
+        reasons.push('负荷未超上限')
+      } else {
+        // 全员超载时不硬派:如实列为未分派,交人工处理
+        unassigned.push({
+          clueId: c.id,
+          taxpayerName: c.taxpayerName,
+          reason: dept ? `${dept}承办人均已达承载上限` : '可用承办人均已达承载上限',
+        })
+        return
+      }
+    }
+    // 同一候选池内取当前在办最少者,保证分派均衡
+    const assignee = pool.slice().sort((a, b) => load[a] / capacityOf(a) - load[b] / capacityOf(b))[0]
+    load[assignee] += 1
+    items.push({
+      clueId: c.id,
+      taxpayerName: c.taxpayerName,
+      riskLevel: c.riskLevel,
+      estimatedTax: c.estimatedTax,
+      assignee,
+      dept: deptOf(assignee),
+      reason: reasons.length ? reasons.join(' · ') : '未启用任何规则,按在办任务数轮转',
+      loadAfter: Math.round((load[assignee] / capacityOf(assignee)) * 100),
+    })
+  })
+
+  const loadAfter: WorkloadRow[] = WORKLOAD_DATA.map((w) => ({
+    ...w,
+    processing: load[w.name],
+    loadRate: Math.round((load[w.name] / w.capacity) * 100),
+  }))
+
+  return { items, unassigned, loadAfter }
+}
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -2563,6 +2760,29 @@ export const mockClient: ApiClient = {
         status: c.status,
       }))
       return delay({ items, total: filtered.length, page: query.page, pageSize: query.pageSize })
+    },
+
+    getMyTaskSummary(): Promise<MyTaskSummary> {
+      const count = (s: MyTaskStatus) => MY_TASK_DATA.filter((t) => t.status === s).length
+      return delay({
+        assignee: MY_ASSIGNEE,
+        updatedAt: '2026-07-24 08:40',
+        statuses: [
+          { value: 'pending', label: '待处理', count: count('pending') },
+          { value: 'processing', label: '处置中', count: count('processing') },
+          { value: 'backfill', label: '待回填', count: count('backfill') },
+          { value: 'overdue', label: '已超期', count: count('overdue') },
+        ],
+      })
+    },
+
+    getMyTasks(status: string): Promise<MyTaskRow[]> {
+      // 已按「超期置顶 + 剩余时限升序」排好序,不再由前端排序
+      return delay(status === 'all' ? MY_TASK_SORTED : MY_TASK_SORTED.filter((t) => t.status === status))
+    },
+
+    getCluePendingCount(): Promise<number> {
+      return delay(CLUE_DATA.filter((c) => c.status === 'pending').length, 120)
     },
 
     getClueDisposalOptions(): Promise<ClueDisposalOptions> {
@@ -3167,15 +3387,23 @@ export const mockClient: ApiClient = {
           { label: '平均派发时长', value: '4.2', unit: '小时', accent: 'teal' },
           { label: '人员平均负荷', value: '68.4', unit: '%', accent: 'gold' },
         ],
-        workloads: [
-          { name: '王××', dept: '城东分局', processing: 18, done: 42, capacity: 25, loadRate: 72 },
-          { name: '李××', dept: '高新区分局', processing: 22, done: 38, capacity: 25, loadRate: 88 },
-          { name: '张××', dept: '城西分局', processing: 12, done: 31, capacity: 25, loadRate: 48 },
-          { name: '陈××', dept: '经开区分局', processing: 16, done: 29, capacity: 25, loadRate: 64 },
-          { name: '赵××', dept: '城南分局', processing: 24, done: 26, capacity: 25, loadRate: 96 },
-          { name: '孙××', dept: '城北分局', processing: 9, done: 22, capacity: 25, loadRate: 36 },
-        ],
+        // 人员负荷与自动派发试算共用同一份名册,避免两处对不上
+        workloads: WORKLOAD_DATA,
       })
+    },
+
+    getDispatchStrategy(): Promise<DispatchStrategy> {
+      return delay({
+        updatedAt: '2026-07-18 15:20',
+        updatedBy: '王××',
+        rules: DISPATCH_RULES,
+        note: '策略仅对「一键自动派发」生效;线索池的单条派发与批量派发仍按人工指定执行。',
+      })
+    },
+
+    previewAutoDispatch(input: DispatchStrategyInput): Promise<DispatchPreview> {
+      // 试算不落库,仅返回分派方案供人工确认
+      return delay(buildDispatchPreview(input), 620)
     },
 
     getDispatchList(query: DispatchQuery): Promise<PagedResult<DispatchRow>> {
@@ -3213,15 +3441,17 @@ export const mockClient: ApiClient = {
     getBackfillFilters(): Promise<BackfillFilters> {
       return delay({
         updatedAt: '2026-07-24 08:00',
+        // 本页只负责「未回填」的催办,故默认口径是 open(待回填 + 草稿 + 被退回)
         statuses: [
-          { value: 'all', label: '全部状态', count: 12 },
+          { value: 'open', label: '未回填', count: 9 },
           { value: 'pending', label: '待回填', count: 5 },
           { value: 'draft', label: '草稿', count: 3 },
-          { value: 'submitted', label: '已提交', count: 3 },
           { value: 'returned', label: '被退回', count: 1 },
+          { value: 'submitted', label: '已提交', count: 3 },
+          { value: 'all', label: '全部状态', count: 12 },
         ],
         kpis: [
-          { label: '待回填任务', value: '5', unit: '项', accent: 'red' },
+          { label: '未回填任务', value: '9', unit: '项', accent: 'red' },
           { label: '已逾期', value: '2', unit: '项', accent: 'gold' },
           { label: '本月已回填', value: '38', unit: '项', accent: 'primary' },
           { label: '按期回填率', value: '91.2', unit: '%', accent: 'green' },
@@ -3250,9 +3480,13 @@ export const mockClient: ApiClient = {
       const kw = query.keyword.trim()
       const filtered = all.filter((r) => {
         if (kw && r.taxpayerName.indexOf(kw) < 0 && r.id.indexOf(kw) < 0 && r.clueId.indexOf(kw) < 0) return false
+        // open = 未回填(待回填 / 草稿 / 被退回),即处置完成但结果尚未提交的任务
+        if (query.status === 'open') return r.status !== 'submitted'
         if (query.status !== 'all' && r.status !== query.status) return false
         return true
       })
+      // 逾期与临期的排在前面,这页的作用就是催办
+      filtered.sort((a, b) => a.daysLeft - b.daysLeft)
       const start = (query.page - 1) * query.pageSize
       return delay({
         items: filtered.slice(start, start + query.pageSize),

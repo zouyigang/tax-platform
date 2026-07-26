@@ -1,15 +1,17 @@
 <script setup lang="ts">
 /**
- * 核查处置工作台(《需求文档》7.3 / 7.4)
- * 由设计稿「风险线索工作台」的详情抽屉拆分升格为独立整页:
- *   左:风险点明细(放大)+ 比对数据对照 + 核查过程时间线
- *   右:结果回填表单(7.4)+ 证据材料上传
- * 无 id 时展示引导空态,提示前往「风险线索池」选取线索。
+ * 核查处置工作台(《需求文档》7.3 / 7.4)· 办理人视角
+ * 与「风险线索池」的分工:线索池是管理者视角(全局线索、批量派发),
+ * 本页是办理人视角 —— 无参数进来看「我的待办」,带参数进来直接办这一条。
+ *   办理界面:左 风险点明细(放大)+ 比对数据对照 + 核查过程时间线
+ *            右 结果回填表单(7.4)+ 证据材料上传
+ * 顶部提供「返回我的待办」与上一条/下一条,方便连续办理。
  * 取数经 @/api/client;提交/退回走二次确认(《交互说明》4.3),成功以 toast 反馈。
  */
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
+import type { MyTaskRow } from '@/api/types'
 import { useResource } from '@/composables/useResource'
 import StateBlock from '@/components/StateBlock.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
@@ -22,7 +24,15 @@ import { CLUE_STATUS_LABEL, CLUE_STATUS_TONE, RISK_LABEL, RISK_TONE, toneClass }
 const route = useRoute()
 const router = useRouter()
 
-const clueId = computed(() => (route.params.id as string) || '')
+/**
+ * 当前办理的线索:优先取 ?taskId=,兼容早期的 /clues/:id 路径形式。
+ * 两种形式都保留,避免既有链接与书签失效。
+ */
+const clueId = computed(() => {
+  const q = route.query.taskId
+  if (typeof q === 'string' && q) return q
+  return (route.params.id as string) || ''
+})
 
 const detail = useResource(() => api.clues.getClueDetail(clueId.value))
 const options = useResource(() => api.clues.getClueDisposalOptions())
@@ -33,8 +43,60 @@ function loadAll() {
   options.load()
 }
 
-onMounted(loadAll)
-watch(clueId, loadAll)
+/* ---------------- 我的待办(无参数时的主体内容) ---------------- */
+const taskStatus = ref('all')
+const taskSummary = useResource(() => api.clues.getMyTaskSummary())
+const tasks = useResource(() => api.clues.getMyTasks(taskStatus.value), { isEmpty: (d) => d.length === 0 })
+const taskList = computed(() => tasks.data.value || [])
+
+function filterTasks(v: string) {
+  taskStatus.value = taskStatus.value === v ? 'all' : v
+  tasks.load()
+}
+function openTask(t: MyTaskRow) {
+  router.push({ path: '/clues', query: { taskId: t.clueId } })
+}
+function backToTasks() {
+  router.push({ path: '/clues' })
+}
+
+/** 连续办理:在当前待办序列里前后切换 */
+const currentIndex = computed(() => taskList.value.findIndex((t) => t.clueId === clueId.value))
+const hasPrev = computed(() => currentIndex.value > 0)
+const hasNext = computed(() => currentIndex.value >= 0 && currentIndex.value < taskList.value.length - 1)
+function goStep(step: number) {
+  const i = currentIndex.value + step
+  if (i < 0 || i >= taskList.value.length) return
+  router.push({ path: '/clues', query: { taskId: taskList.value[i].clueId } })
+}
+
+/* ---------------- 结果回填定位 ---------------- */
+/** 结果回填页跳过来时带 tab=result,进入后滚动到回填表单并高亮一次 */
+const formEl = ref<HTMLElement | null>(null)
+const formFlash = ref(false)
+async function focusResultForm() {
+  await nextTick()
+  const el = formEl.value
+  if (!el) return
+  el.scrollIntoView({ block: 'start' })
+  formFlash.value = true
+  window.setTimeout(() => (formFlash.value = false), 1600)
+}
+
+onMounted(async () => {
+  // 待办列表始终要加载:空态要用它,办理态的上一条/下一条也要用它
+  taskSummary.load()
+  await tasks.load()
+  if (clueId.value) {
+    loadAll()
+    if (route.query.tab === 'result') focusResultForm()
+  }
+})
+
+watch(clueId, () => {
+  loadAll()
+  if (clueId.value && route.query.tab === 'result') focusResultForm()
+})
 
 /** 概览卡 → 该户一户式档案 */
 function openArchive() {
@@ -74,23 +136,109 @@ function confirmReturn(reason: string) {
 function backToPool() {
   router.push('/risk-pool')
 }
+
+/* ---------------- 待办卡展示辅助 ---------------- */
+/** 剩余时限语气:超期红、3 日内橙、其余中性 */
+function limitTone(days: number) {
+  return days < 0 ? 'danger' : days <= 3 ? 'warn' : 'neutral'
+}
+function limitText(days: number) {
+  if (days < 0) return `已超期 ${Math.abs(days)} 天`
+  if (days === 0) return '今日到期'
+  return `剩余 ${days} 天`
+}
+const TASK_STATUS_LABEL: Record<string, string> = {
+  pending: '待处理',
+  processing: '处置中',
+  backfill: '待回填',
+  overdue: '已超期',
+}
+const TASK_STATUS_TONE: Record<string, 'pending' | 'primary' | 'gold' | 'danger'> = {
+  pending: 'pending',
+  processing: 'primary',
+  backfill: 'gold',
+  overdue: 'danger',
+}
 </script>
 
 <template>
   <div class="wb">
-    <PageHeader title="核查处置工作台" breadcrumb="首页 / 风险管理 / 核查处置工作台">
+    <PageHeader
+      title="核查处置工作台"
+      :breadcrumb="clueId ? '首页 / 风险管理 / 核查处置工作台 / 任务办理' : '首页 / 风险管理 / 核查处置工作台'"
+    >
       <template #actions>
-        <button type="button" class="btn" @click="backToPool">返回列表</button>
-        <button v-if="clueId" type="button" class="btn" @click="returnOpen = true">退回</button>
+        <template v-if="clueId">
+          <button type="button" class="btn" @click="backToTasks">返回我的待办</button>
+          <div class="step">
+            <button type="button" class="btn step__btn" :disabled="!hasPrev" @click="goStep(-1)">‹ 上一条</button>
+            <span v-if="currentIndex >= 0" class="step__pos num">
+              {{ currentIndex + 1 }} / {{ taskList.length }}
+            </span>
+            <button type="button" class="btn step__btn" :disabled="!hasNext" @click="goStep(1)">下一条 ›</button>
+          </div>
+          <button type="button" class="btn" @click="returnOpen = true">退回</button>
+        </template>
+        <template v-else>
+          <span v-if="taskSummary.data.value" class="wb__who">
+            办理人 {{ taskSummary.data.value.assignee }} · 更新 {{ taskSummary.data.value.updatedAt }}
+          </span>
+          <button type="button" class="btn" @click="backToPool">前往风险线索池</button>
+        </template>
       </template>
     </PageHeader>
 
-    <!-- 无 id:引导空态 -->
-    <div v-if="!clueId" class="wb__empty">
-      <div class="wb__empty-icon">▤</div>
-      <div class="wb__empty-title">请选择一条风险线索进行核查处置</div>
-      <div class="wb__empty-hint">核查处置工作台按线索逐条办理,请先从风险线索池选取。</div>
-      <button type="button" class="btn btn--primary" @click="backToPool">前往风险线索池</button>
+    <!-- 无参数:我的待办任务 -->
+    <div v-if="!clueId" class="mine">
+      <!-- 状态标签 -->
+      <div class="mine__tabs">
+        <span
+          v-for="s in taskSummary.data.value ? taskSummary.data.value.statuses : []"
+          :key="s.value"
+          class="mtab"
+          :class="[`tone-${TASK_STATUS_TONE[s.value]}`, { 'mtab--on': taskStatus === s.value }]"
+          @click="filterTasks(s.value)"
+        >
+          <i class="mtab__dot"></i>{{ s.label }}<b class="num">{{ s.count }}</b>
+        </span>
+        <span v-if="taskStatus !== 'all'" class="mine__clear" @click="filterTasks(taskStatus)">显示全部</span>
+        <span class="mine__hint">按剩余时限升序排列,超期任务置顶</span>
+      </div>
+
+      <!-- 任务卡列表 -->
+      <StateBlock
+        :status="tasks.status.value"
+        :error="tasks.error.value"
+        empty-text="当前没有待办任务"
+        empty-hint="可切换状态标签查看,或前往风险线索池领取线索"
+        @retry="tasks.load()"
+      >
+        <div class="cards">
+          <div
+            v-for="t in taskList"
+            :key="t.taskId"
+            class="tcard"
+            :class="{ 'tcard--overdue': t.remainDays < 0 }"
+            @click="openTask(t)"
+          >
+            <div class="tcard__top">
+              <span class="tcard__id num">{{ t.clueId }}</span>
+              <BaseBadge :tone="RISK_TONE[t.riskLevel]">{{ RISK_LABEL[t.riskLevel] }}</BaseBadge>
+              <BaseBadge :tone="TASK_STATUS_TONE[t.status]" variant="dot">
+                {{ TASK_STATUS_LABEL[t.status] }}
+              </BaseBadge>
+              <span class="tcard__limit" :class="`tone-${limitTone(t.remainDays)}`">{{ limitText(t.remainDays) }}</span>
+            </div>
+            <div class="tcard__name">{{ t.taxpayerName }}</div>
+            <div class="tcard__meta">
+              <span class="tcard__m"><i>预估税款</i><b class="num">{{ t.estimatedTax.toFixed(2) }} 万</b></span>
+              <span class="tcard__m"><i>命中规则</i><b class="num">{{ t.hitRuleCount }} 条</b></span>
+              <span class="tcard__m"><i>规则类别</i><b>{{ t.category }}</b></span>
+            </div>
+            <div class="tcard__foot num">派发 {{ t.dispatchedAt }} · 时限 {{ t.dueDate }}</div>
+          </div>
+        </div>
+      </StateBlock>
     </div>
 
     <div v-else class="wb__body">
@@ -185,7 +333,7 @@ function backToPool() {
 
             <!-- 右:结果回填 -->
             <div class="wb__col wb__col--right">
-              <section class="card">
+              <section ref="formEl" class="card" :class="{ 'card--flash': formFlash }">
                 <div class="card__title">
                   结果回填
                   <BaseBadge
@@ -252,29 +400,172 @@ function backToPool() {
   line-height: 1.55;
 }
 
-/* 空态 */
-.wb__empty {
+/* ══ 无参数:我的待办 ══ */
+.wb__who {
+  font-size: var(--fs-label);
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+}
+.mine {
   flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4) 20px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: var(--space-3);
 }
-.wb__empty-icon {
-  font-size: 44px;
-  color: var(--color-neutral-400);
-  line-height: 1;
+.mine > * {
+  flex: none;
 }
-.wb__empty-title {
-  font-size: var(--fs-h3);
-  font-weight: var(--fw-semibold);
-  color: var(--color-neutral-700);
+.mine__tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.wb__empty-hint {
+.mtab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: var(--fs-aux);
+  color: var(--color-neutral-700);
+  background: var(--color-panel);
+  border: var(--border-line);
+  border-radius: var(--radius-control);
+  padding: 5px 14px;
+  cursor: pointer;
+}
+.mtab:hover {
+  border-color: var(--color-primary);
+}
+.mtab--on {
+  background: var(--tone-tint);
+  border-color: var(--tone-main);
+  color: var(--tone-text);
+  font-weight: var(--fw-semibold);
+}
+.mtab__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tone-main);
+}
+.mtab b {
+  font-weight: var(--fw-semibold);
+}
+.mine__clear {
+  font-size: var(--fs-label);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+.mine__hint {
+  margin-left: auto;
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+.tcard {
+  background: var(--color-panel);
+  border: var(--border-line);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-control);
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: box-shadow var(--motion-fast) ease, border-color var(--motion-fast) ease;
+}
+.tcard:hover {
+  box-shadow: var(--shadow-sm);
+  border-color: var(--color-primary);
+}
+/* 超期任务整卡加红边,不只靠一个小标签 */
+.tcard--overdue {
+  border-left-color: var(--color-risk-high);
+  background: var(--color-risk-high-tint);
+}
+.tcard__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.tcard__id {
+  font-size: var(--fs-label);
+  color: var(--color-primary);
+  font-weight: var(--fw-medium);
+}
+.tcard__limit {
+  margin-left: auto;
+  font-size: var(--fs-micro);
+  font-weight: var(--fw-semibold);
+  color: var(--tone-text);
+  background: var(--tone-tint);
+  border-radius: var(--radius-control);
+  padding: 1px 7px;
+}
+.tcard__name {
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  color: var(--color-neutral-900);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tcard__meta {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.tcard__m i {
+  font-style: normal;
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+  margin-right: 4px;
+}
+.tcard__m b {
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  color: var(--color-neutral-800);
+}
+.tcard__foot {
+  font-size: var(--fs-micro);
+  color: var(--color-neutral-500);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+/* 连续办理的上一条 / 下一条 */
+.step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.step__btn {
+  height: 30px;
+  padding: 0 10px;
+}
+.step__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.step__pos {
+  font-size: var(--fs-micro);
   color: var(--color-neutral-600);
-  margin-bottom: var(--space-2);
+  white-space: nowrap;
+}
+
+/* 从结果回填页跳入时,回填表单闪烁一次以指明落点 */
+.card--flash {
+  box-shadow: var(--shadow-selected);
+  border-color: var(--color-primary);
 }
 
 .wb__body {

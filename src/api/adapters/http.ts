@@ -33,7 +33,10 @@ import type {
   DispatchBoard,
   DispatchFilters,
   DispatchQuery,
+  DispatchPreview,
   DispatchRow,
+  DispatchStrategy,
+  DispatchStrategyInput,
   DocGenOptions,
   DocGenQuery,
   DocGenResult,
@@ -76,6 +79,8 @@ import type {
   KeyTaxpayerBrief,
   KeyValue,
   KpiCard,
+  MyTaskRow,
+  MyTaskSummary,
   NewEntDetail,
   NewEntFilters,
   NewEntPoint,
@@ -201,6 +206,15 @@ export const httpClient: ApiClient = {
     },
     getClueDisposalOptions(): Promise<ClueDisposalOptions> {
       return get<ClueDisposalOptions>('/clues/disposal-options')
+    },
+    getMyTaskSummary(): Promise<MyTaskSummary> {
+      return get<MyTaskSummary>('/clues/my-tasks/summary')
+    },
+    getMyTasks(status: string): Promise<MyTaskRow[]> {
+      return get<MyTaskRow[]>('/clues/my-tasks', { status })
+    },
+    getCluePendingCount(): Promise<number> {
+      return get<number>('/clues/pending-count')
     },
   },
 
@@ -495,6 +509,15 @@ export const httpClient: ApiClient = {
         riskLevel: query.riskLevel,
         page: query.page,
         pageSize: query.pageSize,
+      })
+    },
+    getDispatchStrategy(): Promise<DispatchStrategy> {
+      return get<DispatchStrategy>('/risk/dispatch/strategy')
+    },
+    previewAutoDispatch(input: DispatchStrategyInput): Promise<DispatchPreview> {
+      // 试算入参较复杂,按约定以逗号分隔的紧凑串传递:key:enabled:weight:priority
+      return get<DispatchPreview>('/risk/dispatch/preview', {
+        rules: input.rules.map((r) => `${r.key}:${r.enabled ? 1 : 0}:${r.weight}:${r.priority}`).join(','),
       })
     },
     getBackfillFilters(): Promise<BackfillFilters> {

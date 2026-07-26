@@ -2,11 +2,31 @@
 // 全局侧栏 · 两级折叠菜单(深色表面色体系,沿用《平台侧栏》视觉)
 // 一级:单页型直接跳转;分组型点击折叠/展开。二级:叶子路由项。
 // 当前路由高亮,并默认展开其所在的一级分组。
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { MENU, isGroup } from '@/config/menu'
+import { MENU, isGroup, type MenuLeaf } from '@/config/menu'
+import { api } from '@/api/client'
 
 const route = useRoute()
+
+/**
+ * 动态角标:菜单只声明数据键,数值在此取。
+ * 写死数字会与列表实际条数脱节(此前菜单显示 137、列表只有 24 条),
+ * 故统一由接口给出,与线索池同源。
+ */
+const badges = ref<Record<string, number>>({})
+function badgeOf(leaf: MenuLeaf): string {
+  if (!leaf.badgeKey) return ''
+  const v = badges.value[leaf.badgeKey]
+  return v === undefined || v <= 0 ? '' : String(v)
+}
+onMounted(async () => {
+  try {
+    badges.value = { 'clue-pending': await api.clues.getCluePendingCount() }
+  } catch {
+    // 角标取数失败不影响导航可用,静默留空即可
+  }
+})
 
 // 当前激活叶子 key(取 route.meta.nav,详情页如 /clues/:id 也能正确点亮所属菜单)
 const activeKey = computed(() => (route.meta.nav as string) || '')
@@ -84,7 +104,7 @@ function isLeafActive(key: string) {
             >
               <span class="nav-sub__dot"></span>
               <span class="nav-sub__name">{{ child.title }}</span>
-              <span v-if="child.badge" class="nav-sub__badge num">{{ child.badge }}</span>
+              <span v-if="badgeOf(child)" class="nav-sub__badge num">{{ badgeOf(child) }}</span>
               <span v-else-if="child.status === 'placeholder'" class="nav-sub__wip" title="建设中">·</span>
             </router-link>
           </div>
