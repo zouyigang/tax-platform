@@ -234,6 +234,35 @@ export const TRACK = {
   symbolFill: '#FFFFFF',
 }
 
+/** 税源监控·收入预测配色(视觉重心在预测段:历史弱化、预测强化) */
+export const FORECAST = {
+  /** 历史实际值:细实线、弱化 */
+  history: '#8FA6BC',
+  /** 历史段模型回算值(细虚线,用于对照) */
+  fitted: '#C4CDD6',
+  /** 预测值:粗虚线、主色深调 */
+  predict: '#16436F',
+  /** 置信区间带 */
+  band: '#1D5A99',
+  bandOpacity: 0.12,
+  /** 预测区底纹(把视觉重心压到右半边) */
+  futureBg: '#1D5A99',
+  futureBgOpacity: 0.035,
+  /** 历史 / 预测 分界线 */
+  divider: '#C0392B',
+  /** 网格线 / 轴文字 */
+  grid: '#EAEEF3',
+  axis: '#97A3B0',
+  axisText: '#4C5A68',
+  symbolFill: '#FFFFFF',
+  /** 误差回溯柱:预测偏高 / 预测偏低 */
+  devHigh: '#C0392B',
+  devLow: '#2E8757',
+  /** ±5% 可接受带 */
+  devBand: '#2E8757',
+  devBandOpacity: 0.08,
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

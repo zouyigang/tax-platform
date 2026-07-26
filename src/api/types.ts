@@ -2775,6 +2775,154 @@ export interface KeySourceDetail {
   causes: DeclineCause[]
 }
 
+/* ------------------------------------------------------------------------
+ * 税源监控 · 收入预测分析(《需求文档》6.2)
+ * 图表驱动页,视觉重心在「未来」:历史段只作参照(细实线、颜色弱化),
+ * 预测段才是主体(粗虚线 + 置信区间带 + 区域底纹)。
+ * 误差回溯是本页的必要组成 —— 不给出模型历史准确度,预测值就无从取信。
+ * ---------------------------------------------------------------------- */
+
+/** 预测周期 */
+export type ForecastPeriod = 'month' | 'quarter' | 'year'
+
+/** 预测曲线上的一个点(历史段与预测段共用同一条时间轴) */
+export interface ForecastPoint {
+  /** 期次标签 */
+  label: string
+  /** 实际入库(万元);预测段为 null */
+  actual: number | null
+  /** 预测值(万元);历史段为模型回算值,用于对照 */
+  predicted: number
+  /** 置信区间下限(万元) */
+  lower: number
+  /** 置信区间上限(万元) */
+  upper: number
+  /** 是否属于预测段 */
+  isForecast: boolean
+}
+
+/** 预测影响因素 */
+export interface ForecastFactor {
+  /** 因素名称 */
+  name: string
+  /** 对预测值的贡献(带符号,如 "+2.4pct") */
+  contribution: string
+  /** 贡献方向语义 */
+  tone: DeltaTone
+  /** 因素说明 */
+  note: string
+}
+
+/** 预测摘要(右侧卡) */
+export interface ForecastSummary {
+  /** 预测期次标签 */
+  periodLabel: string
+  /** 本期预测值(万元) */
+  predicted: number
+  /** 置信区间下限 */
+  lower: number
+  /** 置信区间上限 */
+  upper: number
+  /** 置信度(百分数,如 90) */
+  confidence: number
+  /** 同比预期(带符号) */
+  yoy: string
+  /** 同比语义 */
+  yoyTone: DeltaTone
+  /** 环比预期(带符号) */
+  mom: string
+  /** 环比语义 */
+  momTone: DeltaTone
+  /** 主要影响因素 */
+  factors: ForecastFactor[]
+}
+
+/** 误差回溯的一期 */
+export interface ForecastErrorPoint {
+  /** 期次标签 */
+  label: string
+  /** 当期预测值(万元) */
+  predicted: number
+  /** 当期实际值(万元) */
+  actual: number
+  /** 偏差率(百分数,带符号;正=预测偏高) */
+  deviation: number
+}
+
+/** 模型准确度(误差回溯) */
+export interface ForecastAccuracy {
+  /** 近 12 期回溯 */
+  points: ForecastErrorPoint[]
+  /** 平均绝对误差 MAPE(百分数) */
+  mape: number
+  /** 偏差落在 ±5% 内的期数 */
+  within5: number
+  /** 最大单期偏差(百分数,带符号) */
+  maxDeviation: string
+}
+
+/** 预测偏差预警等级 */
+export type ForecastAlert = 'none' | 'watch' | 'alert'
+
+/** 分税种分区县预测明细行 */
+export interface ForecastDetailRow {
+  /** 行唯一键 */
+  key: string
+  /** 税种名称 */
+  taxType: string
+  /** 区县名称 */
+  district: string
+  /** 本期预测值(万元) */
+  predicted: number
+  /** 上期实际值(万元) */
+  lastActual: number
+  /** 增幅预期(带符号) */
+  growth: string
+  /** 增幅语义 */
+  growthTone: DeltaTone
+  /** 偏差预警等级 */
+  alert: ForecastAlert
+  /** 预警说明 */
+  alertNote: string
+}
+
+/** 收入预测·查询参数 */
+export interface ForecastQuery {
+  /** 预测周期 */
+  period: ForecastPeriod
+  /** 税种编码;'all' 全部税种 */
+  taxType: string
+  /** 区县编码;'all' 全市 */
+  districtCode: string
+}
+
+/** 收入预测·筛选项 */
+export interface ForecastFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 预测周期选项 */
+  periods: FilterOption[]
+  /** 税种选项(含「全部税种」) */
+  taxTypes: FilterOption[]
+  /** 区县选项(含「全市」) */
+  districts: FilterOption[]
+}
+
+/** 收入预测分析(一次取全,四个区块同源以免口径打架)
+ *  注:名称避开决策分析模块已有的 RevenueForecast(那个是驾驶舱年度预测曲线) */
+export interface ForecastBoard {
+  /** 预测方法说明 */
+  method: string
+  /** 主图数据(历史段 + 预测段) */
+  chart: ForecastPoint[]
+  /** 预测摘要 */
+  summary: ForecastSummary
+  /** 模型准确度回溯 */
+  accuracy: ForecastAccuracy
+  /** 分税种分区县明细 */
+  details: ForecastDetailRow[]
+}
+
 /** 税源监控接口分组 */
 export interface TaxSourceApi {
   /** 重点税源·筛选项、分档与预警分组 */
@@ -2783,6 +2931,10 @@ export interface TaxSourceApi {
   getKeySources(query: KeySourceQuery): Promise<PagedResult<KeySourceRow>>
   /** 重点税源·监控详情(多指标时间轴 + 下降归因) */
   getKeySourceDetail(taxId: string): Promise<KeySourceDetail>
+  /** 收入预测·筛选项 */
+  getForecastFilters(): Promise<ForecastFilters>
+  /** 收入预测·主图 / 摘要 / 误差回溯 / 明细 */
+  getRevenueForecast(query: ForecastQuery): Promise<ForecastBoard>
 }
 
 /* ========================================================================

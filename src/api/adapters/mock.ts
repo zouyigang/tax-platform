@@ -60,6 +60,15 @@ import type {
   EntityMatchFilters,
   EntityMatchQuery,
   EntityMatchRow,
+  ForecastAccuracy,
+  ForecastAlert,
+  ForecastDetailRow,
+  ForecastErrorPoint,
+  ForecastFilters,
+  ForecastPeriod,
+  ForecastPoint,
+  ForecastQuery,
+  ForecastSummary,
   GangDetail,
   GangEvidence,
   GangFilters,
@@ -91,6 +100,7 @@ import type {
   TaxSourceTier,
   PagedResult,
   QaSession,
+  ForecastBoard,
   RevenueTrend,
   RiskLevel,
   RiskTaskFunnel,
@@ -1219,6 +1229,178 @@ function buildKeySourceDetail(row: KeySourceRow): KeySourceDetail {
       ? `本年入库同比 ${row.yoy},降幅主要出现在近 4 期。税额与开票量同步回落,但社保参保人数与用电量基本平稳,交叉印证不支持"实际停产"的判断,优先核实减免政策适用与申报口径。`
       : `本年入库同比 ${row.yoy},各项指标同步平稳,未出现需要归因的异常回落。`,
     causes,
+  }
+}
+
+/* ==================== 税源监控:收入预测演示数据 ==================== */
+
+/** 税种及其月度基数(万元) */
+const FC_TAX = [
+  { code: 'vat', name: '增值税', base: 42000 },
+  { code: 'eit', name: '企业所得税', base: 18600 },
+  { code: 'iit', name: '个人所得税', base: 7400 },
+  { code: 'consume', name: '消费税', base: 5200 },
+  { code: 'stamp', name: '印花税', base: 2100 },
+  { code: 'other', name: '其他税种', base: 3800 },
+]
+
+/** 区县收入占比 */
+const FC_DISTRICT: Array<{ code: string; share: number }> = [
+  { code: 'gaoxin', share: 0.26 },
+  { code: 'chengdong', share: 0.22 },
+  { code: 'chengxi', share: 0.18 },
+  { code: 'jiangbei', share: 0.16 },
+  { code: 'linjiang', share: 0.1 },
+  { code: 'yunling', share: 0.08 },
+]
+
+/** 各周期的历史 / 预测期次标签 */
+const FC_PERIODS: Record<ForecastPeriod, { history: string[]; forecast: string[]; factor: number }> = {
+  month: {
+    history: ['2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07'],
+    forecast: ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01'],
+    factor: 1,
+  },
+  quarter: {
+    history: ['2024Q3', '2024Q4', '2025Q1', '2025Q2', '2025Q3', '2025Q4', '2026Q1', '2026Q2'],
+    forecast: ['2026Q3', '2026Q4', '2027Q1', '2027Q2'],
+    factor: 3,
+  },
+  year: {
+    history: ['2021年', '2022年', '2023年', '2024年', '2025年'],
+    forecast: ['2026年', '2027年'],
+    factor: 12,
+  },
+}
+
+/** 季节性系数:一季度偏低、年末冲高,与征期规律一致 */
+function fcSeason(label: string): number {
+  const m = /-(\d{2})$/.exec(label)
+  if (m) {
+    const mm = parseInt(m[1], 10)
+    return [0.86, 0.78, 1.06, 1.12, 0.98, 1.04, 0.94, 0.97, 1.02, 1.0, 1.03, 1.18][mm - 1]
+  }
+  if (/Q1/.test(label)) return 0.9
+  if (/Q4/.test(label)) return 1.12
+  return 1.0
+}
+
+/** 当前筛选下的规模系数 */
+function fcScale(taxType: string, districtCode: string): number {
+  const taxBase = taxType === 'all'
+    ? FC_TAX.reduce((s, t) => s + t.base, 0)
+    : (FC_TAX.filter((t) => t.code === taxType)[0] || FC_TAX[0]).base
+  const share = districtCode === 'all' ? 1 : (FC_DISTRICT.filter((d) => d.code === districtCode)[0] || FC_DISTRICT[0]).share
+  return taxBase * share
+}
+
+/** 构造收入预测(四个区块同源:主图 / 摘要 / 误差回溯 / 明细) */
+function buildForecast(query: ForecastQuery): ForecastBoard {
+  const cfg = FC_PERIODS[query.period] || FC_PERIODS.month
+  const scale = fcScale(query.taxType, query.districtCode) * cfg.factor
+  const all = cfg.history.concat(cfg.forecast)
+  const hn = cfg.history.length
+  // 趋势:年化增长约 6%,按期次折算
+  const growthPerStep = query.period === 'year' ? 0.062 : query.period === 'quarter' ? 0.015 : 0.005
+
+  const chart: ForecastPoint[] = all.map((label, i) => {
+    const trend = scale * Math.pow(1 + growthPerStep, i)
+    const season = fcSeason(label)
+    const noise = 1 + (rand(i * 41 + query.period.length) - 0.5) * 0.05
+    const isForecast = i >= hn
+    const predicted = +(trend * season).toFixed(1)
+    // 置信区间随预测步长走阔:第 1 期 ±3.2%,之后每期再加 1.1%
+    const halfWidth = isForecast ? 0.032 + (i - hn) * 0.011 : 0
+    return {
+      label,
+      actual: isForecast ? null : +(trend * season * noise).toFixed(1),
+      predicted,
+      lower: +(predicted * (1 - halfWidth)).toFixed(1),
+      upper: +(predicted * (1 + halfWidth)).toFixed(1),
+      isForecast,
+    }
+  })
+
+  const first = chart[hn]
+  const prevActual = chart[hn - 1].actual as number
+  // 同比对照点:月度取 12 期前、季度取 4 期前、年度取 1 期前
+  const yoyBack = query.period === 'month' ? 12 : query.period === 'quarter' ? 4 : 1
+  const yoyBase = chart[Math.max(0, hn - yoyBack)].actual || prevActual
+  const yoyNum = +(((first.predicted - yoyBase) / yoyBase) * 100).toFixed(1)
+  const momNum = +(((first.predicted - prevActual) / prevActual) * 100).toFixed(1)
+
+  const summary: ForecastSummary = {
+    periodLabel: first.label,
+    predicted: first.predicted,
+    lower: first.lower,
+    upper: first.upper,
+    confidence: 90,
+    yoy: yoyNum >= 0 ? `+${yoyNum.toFixed(1)}%` : `${yoyNum.toFixed(1)}%`,
+    yoyTone: (yoyNum > 0 ? 'positive' : yoyNum < 0 ? 'negative' : 'neutral') as DeltaTone,
+    mom: momNum >= 0 ? `+${momNum.toFixed(1)}%` : `${momNum.toFixed(1)}%`,
+    momTone: (momNum > 0 ? 'positive' : momNum < 0 ? 'negative' : 'neutral') as DeltaTone,
+    factors: [
+      { name: '规上工业增加值', contribution: '+2.4pct', tone: 'positive', note: '前值同比 +6.8%,对增值税形成主要支撑' },
+      { name: '房地产交易回暖', contribution: '+1.1pct', tone: 'positive', note: '商品房成交面积环比 +14%,带动契税与土增税' },
+      { name: '留抵退税政策', contribution: '-1.8pct', tone: 'negative', note: '制造业留抵退税延续,冲减当期入库' },
+      { name: '小微普惠减免', contribution: '-0.9pct', tone: 'negative', note: '小规模纳税人征收率优惠继续执行' },
+      { name: '季节性征期因素', contribution: '+0.6pct', tone: 'positive', note: '该期含季度申报,入库天然偏高' },
+    ],
+  }
+
+  // 误差回溯:近 12 期(不足则取全部历史),偏差在 ±8% 内波动
+  const backCount = Math.min(12, hn)
+  const points: ForecastErrorPoint[] = chart.slice(hn - backCount, hn).map((p, i) => {
+    const actual = p.actual as number
+    const dev = +(((p.predicted - actual) / actual) * 100).toFixed(1)
+    return { label: p.label, predicted: p.predicted, actual, deviation: dev }
+  })
+  const absSum = points.reduce((s, p) => s + Math.abs(p.deviation), 0)
+  const maxDev = points.reduce((m, p) => (Math.abs(p.deviation) > Math.abs(m) ? p.deviation : m), 0)
+  const accuracy: ForecastAccuracy = {
+    points,
+    mape: +(absSum / (points.length || 1)).toFixed(2),
+    within5: points.filter((p) => Math.abs(p.deviation) <= 5).length,
+    maxDeviation: maxDev >= 0 ? `+${maxDev.toFixed(1)}%` : `${maxDev.toFixed(1)}%`,
+  }
+
+  // 明细:税种 × 区县 交叉,按当前筛选收窄
+  const taxes = query.taxType === 'all' ? FC_TAX : FC_TAX.filter((t) => t.code === query.taxType)
+  const dists = query.districtCode === 'all' ? FC_DISTRICT : FC_DISTRICT.filter((d) => d.code === query.districtCode)
+  const details: ForecastDetailRow[] = []
+  taxes.forEach((t, ti) => {
+    dists.forEach((d, di) => {
+      const seed = ti * 13 + di * 7
+      const predicted = +(t.base * d.share * cfg.factor * Math.pow(1 + growthPerStep, hn) * fcSeason(first.label)).toFixed(1)
+      const g = +(((rand(seed) - 0.42) * 26)).toFixed(1)
+      const lastActual = +(predicted / (1 + g / 100)).toFixed(1)
+      // 增幅明显偏离全局预期时给出偏差预警,提示该组合的预测不确定性更高
+      const alert: ForecastAlert = Math.abs(g - yoyNum) > 12 ? 'alert' : Math.abs(g - yoyNum) > 7 ? 'watch' : 'none'
+      details.push({
+        key: `${t.code}-${d.code}`,
+        taxType: t.name,
+        district: DISTRICT_CN[d.code],
+        predicted,
+        lastActual,
+        growth: g >= 0 ? `+${g.toFixed(1)}%` : `${g.toFixed(1)}%`,
+        growthTone: (g > 0 ? 'positive' : g < 0 ? 'negative' : 'neutral') as DeltaTone,
+        alert,
+        alertNote:
+          alert === 'alert'
+            ? `增幅预期偏离全局 ${Math.abs(g - yoyNum).toFixed(1)}pct,建议人工复核`
+            : alert === 'watch'
+              ? `增幅预期偏离全局 ${Math.abs(g - yoyNum).toFixed(1)}pct,需关注`
+              : '与全局预期一致',
+      })
+    })
+  })
+
+  return {
+    method: 'ARIMA 季节性模型 + 经济指标回归修正,置信度 90%',
+    chart,
+    summary,
+    accuracy,
+    details,
   }
 }
 
@@ -2601,6 +2783,27 @@ export const mockClient: ApiClient = {
     getKeySourceDetail(taxId: string): Promise<KeySourceDetail> {
       const row = KEY_SOURCE_DATA.filter((r) => r.taxId === taxId)[0] || KEY_SOURCE_DATA[0]
       return delay(buildKeySourceDetail(row))
+    },
+
+    getForecastFilters(): Promise<ForecastFilters> {
+      return delay({
+        updatedAt: '2026-07-24 07:10',
+        periods: [
+          { value: 'month', label: '月度' },
+          { value: 'quarter', label: '季度' },
+          { value: 'year', label: '年度' },
+        ],
+        taxTypes: [{ value: 'all', label: '全部税种' }].concat(
+          FC_TAX.map((t) => ({ value: t.code, label: t.name })),
+        ),
+        districts: [{ value: 'all', label: '全市' }].concat(
+          FC_DISTRICT.map((d) => ({ value: d.code, label: DISTRICT_CN[d.code] })),
+        ),
+      })
+    },
+
+    getRevenueForecast(query: ForecastQuery): Promise<ForecastBoard> {
+      return delay(buildForecast(query))
     },
   },
 

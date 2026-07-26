@@ -211,12 +211,7 @@ export const MENU: MenuEntry[] = [
         key: 'tax-source-forecast',
         title: '收入预测分析',
         path: '/tax-source/forecast',
-        status: 'placeholder',
-        desc: [
-          '基于历史入库与经济指标预测税收收入走势。',
-          '支持分税种、分行业、分期次的预测与偏差回溯。',
-          '对应需求 6.2 收入预测。',
-        ],
+        status: 'done',
       },
       {
         key: 'tax-source-new-enterprise',

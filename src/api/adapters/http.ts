@@ -48,6 +48,8 @@ import type {
   EntityMatchFilters,
   EntityMatchQuery,
   EntityMatchRow,
+  ForecastFilters,
+  ForecastQuery,
   GangDetail,
   GangFilters,
   GangQuery,
@@ -66,6 +68,7 @@ import type {
   KpiCard,
   PagedResult,
   QaSession,
+  ForecastBoard,
   RevenueTrend,
   RiskTaskFunnel,
   RuleDetail,
@@ -250,6 +253,16 @@ export const httpClient: ApiClient = {
     },
     getKeySourceDetail(taxId: string): Promise<KeySourceDetail> {
       return get<KeySourceDetail>(`/tax-source/key/${encodeURIComponent(taxId)}`)
+    },
+    getForecastFilters(): Promise<ForecastFilters> {
+      return get<ForecastFilters>('/tax-source/forecast/filters')
+    },
+    getRevenueForecast(query: ForecastQuery): Promise<ForecastBoard> {
+      return get<ForecastBoard>('/tax-source/forecast', {
+        period: query.period,
+        taxType: query.taxType,
+        districtCode: query.districtCode,
+      })
     },
   },
 
