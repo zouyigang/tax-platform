@@ -65,6 +65,12 @@ import type {
   RuleQuery,
   RuleRow,
   RuleStatus,
+  ScoreAttribution,
+  ScoreFilters,
+  ScoreModelState,
+  ScoreQuery,
+  ScoreRow,
+  ShapItem,
   SourceContribution,
   TaxTypeStructure,
 } from '../types'
@@ -274,6 +280,214 @@ const RULE_DATA: RawRule[] = [
   { id: 'ZJ-DE-004', name: '法人个人账户大额往来', categoryCode: 'fund.large', taxTypes: ['iit'], model: 'threshold', riskLevel: 'mid', status: 'testing', monthHit: 43, hitRate: 37.9 },
   { id: 'QT-ZH-001', name: '多维度综合高风险', categoryCode: 'other.comprehensive', taxTypes: ['vat', 'eit', 'iit'], model: 'logic', riskLevel: 'high', status: 'enabled', monthHit: 102, hitRate: 59.6 },
 ]
+
+/* ==================== 智能模型:风险评分演示数据 ==================== */
+
+/** 区县编码 → 名称(评分结果按区县筛选时复用) */
+const DISTRICT_CN: Record<string, string> = {
+  chengdong: '城东区',
+  gaoxin: '高新区',
+  chengxi: '城西区',
+  jiangbei: '江北新区',
+  linjiang: '临江县',
+  yunling: '云岭县',
+}
+
+/** 行业编码 → 名称 */
+const INDUSTRY_CN: Record<string, string> = {
+  wholesale: '批发零售',
+  construction: '建筑安装',
+  manufacture: '制造业',
+  realestate: '房地产',
+  service: '商务服务',
+  transport: '交通运输',
+}
+const INDUSTRY_CODES = ['wholesale', 'construction', 'manufacture', 'realestate', 'service', 'transport']
+
+/**
+ * 入模特征字典(TOP20,按重要性降序)
+ * weight  —— 归一化重要性(百分数),TOP20 合计 89.7%,其余 46 个特征合计 10.3%
+ * vBase / bench —— 演示用的特征取值与同行业中位数,按户做小幅浮动
+ */
+interface RawFeature {
+  name: string
+  dim: string
+  weight: number
+  vBase: number
+  bench: number
+  unit: string
+  dec: number
+}
+const FEATURES: RawFeature[] = [
+  { name: '进销项金额偏离度', dim: '发票', weight: 9.8, vBase: 24.6, bench: 8.0, unit: '%', dec: 1 },
+  { name: '增值税税负率', dim: '税负', weight: 8.6, vBase: 1.86, bench: 3.28, unit: '%', dec: 2 },
+  { name: '开票额/申报销售额比', dim: '发票', weight: 7.9, vBase: 1.21, bench: 1.0, unit: '倍', dec: 2 },
+  { name: '近 6 月作废红冲率', dim: '发票', weight: 6.7, vBase: 12.4, bench: 3.5, unit: '%', dec: 1 },
+  { name: '企业所得税贡献率', dim: '税负', weight: 6.2, vBase: 0.38, bench: 1.15, unit: '%', dec: 2 },
+  { name: '申报收入环比波动', dim: '申报', weight: 5.8, vBase: 46.2, bench: 12.0, unit: '%', dec: 1 },
+  { name: '用电测算产值/申报产值', dim: '外部', weight: 5.3, vBase: 1.68, bench: 1.05, unit: '倍', dec: 2 },
+  { name: '连续零负申报月数', dim: '申报', weight: 4.9, vBase: 5, bench: 0, unit: '月', dec: 0 },
+  { name: '法人关联企业注销数', dim: '关联', weight: 4.5, vBase: 3, bench: 0, unit: '户', dec: 0 },
+  { name: '社保参保/个税申报人数', dim: '外部', weight: 4.2, vBase: 2.35, bench: 1.02, unit: '倍', dec: 2 },
+  { name: '成本费用率同业偏离', dim: '成本', weight: 3.9, vBase: 18.6, bench: 0, unit: 'pct', dec: 1 },
+  { name: '银行流水/申报收入比', dim: '资金', weight: 3.6, vBase: 1.42, bench: 1.03, unit: '倍', dec: 2 },
+  { name: '发票领用量环比倍数', dim: '发票', weight: 3.3, vBase: 2.8, bench: 1.1, unit: '倍', dec: 1 },
+  { name: '注册地经营地一致性', dim: '登记', weight: 3.0, vBase: 0.42, bench: 1.0, unit: '分', dec: 2 },
+  { name: '实际控制人涉案关联度', dim: '关联', weight: 2.7, vBase: 0.36, bench: 0.05, unit: '分', dec: 2 },
+  { name: '开业年限', dim: '登记', weight: 2.4, vBase: 14, bench: 62, unit: '月', dec: 0 },
+  { name: '进项税额转出占比', dim: '发票', weight: 2.1, vBase: 6.8, bench: 1.2, unit: '%', dec: 1 },
+  { name: '历史核查查实次数', dim: '历史', weight: 1.9, vBase: 2, bench: 0, unit: '次', dec: 0 },
+  { name: '优惠备案项数', dim: '优惠', weight: 1.6, vBase: 4, bench: 1, unit: '项', dec: 0 },
+  { name: '法人变更频次', dim: '登记', weight: 1.3, vBase: 3, bench: 0, unit: '次', dec: 0 },
+]
+
+/** 模型基准分:全样本平均分,SHAP 归因的基线 */
+const SCORE_BASE = 42.6
+
+/** 演示补充的纳税人(与风险线索池 24 户合并为 48 户评分样本) */
+const EXTRA_TAXPAYERS: Array<{ name: string; taxId: string; districtCode: string }> = [
+  { name: '城东区某钢材贸易公司', taxId: '91....MA2F7K', districtCode: 'chengdong' },
+  { name: '城东区某工程机械租赁部', taxId: '91....MA4H2L', districtCode: 'chengdong' },
+  { name: '城东区某人力资源公司', taxId: '91....MA6J9P', districtCode: 'chengdong' },
+  { name: '城东区某冷链食品公司', taxId: '91....MA8K3R', districtCode: 'chengdong' },
+  { name: '高新区某集成电路公司', taxId: '91....MA1L5T', districtCode: 'gaoxin' },
+  { name: '高新区某生物医药公司', taxId: '91....MA3M8V', districtCode: 'gaoxin' },
+  { name: '高新区某网络科技公司', taxId: '91....MA5N2W', districtCode: 'gaoxin' },
+  { name: '高新区某检测认证公司', taxId: '91....MA7P6X', districtCode: 'gaoxin' },
+  { name: '城西区某家居建材城', taxId: '91....MA9Q4Y', districtCode: 'chengxi' },
+  { name: '城西区某房地产开发公司', taxId: '91....MA2R7Z', districtCode: 'chengxi' },
+  { name: '城西区某广告传媒公司', taxId: '91....MA4S1A', districtCode: 'chengxi' },
+  { name: '城西区某二手车经销公司', taxId: '91....MA6T5B', districtCode: 'chengxi' },
+  { name: '江北新区某模具制造厂', taxId: '91....MA8V9C', districtCode: 'jiangbei' },
+  { name: '江北新区某市政工程公司', taxId: '91....MA1W3D', districtCode: 'jiangbei' },
+  { name: '江北新区某化工材料公司', taxId: '91....MA3X8E', districtCode: 'jiangbei' },
+  { name: '江北新区某仓储服务公司', taxId: '91....MA5Y2F', districtCode: 'jiangbei' },
+  { name: '临江县某水泥制品厂', taxId: '91....MA7Z6G', districtCode: 'linjiang' },
+  { name: '临江县某商贸物流园', taxId: '91....MA9A1H', districtCode: 'linjiang' },
+  { name: '临江县某园林绿化公司', taxId: '91....MA2B4J', districtCode: 'linjiang' },
+  { name: '临江县某汽配经营部', taxId: '91....MA4C8K', districtCode: 'linjiang' },
+  { name: '云岭县某石材加工厂', taxId: '91....MA6D2L', districtCode: 'yunling' },
+  { name: '云岭县某旅游开发公司', taxId: '91....MA8E7M', districtCode: 'yunling' },
+  { name: '云岭县某农产品加工厂', taxId: '91....MA1F3N', districtCode: 'yunling' },
+  { name: '云岭县某建材经销处', taxId: '91....MA3G9P', districtCode: 'yunling' },
+]
+
+/**
+ * 评分样本集(48 户)
+ * 前 24 户直接取自风险线索池数据集,保证演示时两页看到的是同一批纳税人;
+ * 分值由命中规则数、预估税款与风险等级推导,使评分与线索命中互相印证。
+ */
+const SCORE_DATA: ScoreRow[] = (() => {
+  const fromClue = CLUE_DATA.map((c, i) => {
+    const raw = 52 + c.hitRuleCount * 4.6 + Math.min(18, c.estimatedTax / 12) + (c.riskLevel === 'high' ? 6 : c.riskLevel === 'mid' ? 2 : 0)
+    return {
+      name: c.taxpayerName,
+      taxId: c.taxId,
+      districtCode: c.districtCode,
+      score: Math.min(98.4, +raw.toFixed(1)),
+      hasClue: true,
+      seed: i,
+    }
+  })
+  const extra = EXTRA_TAXPAYERS.map((e, i) => ({
+    name: e.name,
+    taxId: e.taxId,
+    districtCode: e.districtCode,
+    // 未成线索的样本分值整体偏低,呈现「评分 → 线索」的漏斗关系
+    score: +(38 + ((i * 37) % 43) + ((i * 13) % 7) * 0.9).toFixed(1),
+    hasClue: false,
+    seed: i + 24,
+  }))
+  return fromClue
+    .concat(extra)
+    .sort((a, b) => b.score - a.score)
+    .map((t, idx) => {
+      const level: RiskLevel = t.score >= 80 ? 'high' : t.score >= 60 ? 'mid' : 'low'
+      const deltaNum = +(((t.seed * 17) % 21) - 8 + (t.seed % 3) * 0.4).toFixed(1)
+      // 主要驱动因子:按户偏移取特征字典的前两项,和归因面板保持同一套特征
+      const f1 = FEATURES[t.seed % 6]
+      const f2 = FEATURES[(t.seed + 3) % 9]
+      return {
+        rank: idx + 1,
+        taxId: t.taxId,
+        taxpayerName: t.name,
+        district: DISTRICT_CN[t.districtCode] || t.districtCode,
+        industry: INDUSTRY_CN[INDUSTRY_CODES[t.seed % INDUSTRY_CODES.length]],
+        score: t.score,
+        level,
+        // 分位由分值反推(分值越高分位越靠前),与 12,486 户的全量评分分布口径一致
+        percentile: +((100 - t.score) * 0.62 + 0.3).toFixed(1),
+        delta: deltaNum >= 0 ? `+${deltaNum.toFixed(1)}` : deltaNum.toFixed(1),
+        // 分值上升 = 风险恶化,故用 negative 语义;下降为 positive
+        deltaTone: (deltaNum > 0 ? 'negative' : deltaNum < 0 ? 'positive' : 'neutral') as ScoreRow['deltaTone'],
+        topFactors: [f1.name, f2.name],
+        hasClue: t.hasClue,
+      }
+    })
+})()
+
+/** 区县名称 → 编码(评分列表按编码筛选) */
+const DISTRICT_CODE_BY_CN: Record<string, string> = Object.keys(DISTRICT_CN).reduce(
+  (acc, code) => {
+    acc[DISTRICT_CN[code]] = code
+    return acc
+  },
+  {} as Record<string, string>,
+)
+const INDUSTRY_CODE_BY_CN: Record<string, string> = Object.keys(INDUSTRY_CN).reduce(
+  (acc, code) => {
+    acc[INDUSTRY_CN[code]] = code
+    return acc
+  },
+  {} as Record<string, string>,
+)
+
+/** 按特征字典与户序号生成取值文案(同一户多次查看结果稳定) */
+function featValue(f: RawFeature, seed: number, i: number): string {
+  const wobble = 1 + (((seed * 3 + i * 5) % 9) - 4) * 0.06
+  return `${(f.vBase * wobble).toFixed(f.dec)}${f.unit}`
+}
+
+/** 构造单户 SHAP 归因:贡献值之和 = 风险分 − 基准分 */
+function buildAttribution(row: ScoreRow): ScoreAttribution {
+  const gap = +(row.score - SCORE_BASE).toFixed(1)
+  const seed = row.rank
+  // 每户入选特征略有差异,避免所有企业归因雷同
+  const picked = FEATURES.filter((_, i) => (i * 7 + seed) % 4 !== 3).slice(0, 10)
+  const signs = [1, 1, 1, 1, -1, 1, 1, -1, 1, -1]
+  const raw = picked.map((f, i) => f.weight * (1 + ((seed + i) % 5) * 0.14) * signs[i])
+  const sum = raw.reduce((s, v) => s + v, 0)
+  const k = sum === 0 ? 0 : gap / sum
+  const items: ShapItem[] = picked
+    .map((f, i) => ({
+      feature: f.name,
+      value: featValue(f, seed, i),
+      benchmark: `${f.bench.toFixed(f.dec)}${f.unit}`,
+      contribution: +(raw[i] * k).toFixed(1),
+    }))
+    .sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution))
+  const positiveSum = +items.filter((it) => it.contribution > 0).reduce((s, it) => s + it.contribution, 0).toFixed(1)
+  const negativeSum = +items.filter((it) => it.contribution < 0).reduce((s, it) => s + it.contribution, 0).toFixed(1)
+  const top = items[0]
+  return {
+    taxId: row.taxId,
+    taxpayerName: row.taxpayerName,
+    score: row.score,
+    level: row.level,
+    percentile: row.percentile,
+    baseScore: SCORE_BASE,
+    positiveSum,
+    negativeSum,
+    items,
+    summary: `该户风险分较基准分高 ${gap.toFixed(1)} 分,其中「${top.feature}」贡献 ${top.contribution.toFixed(1)} 分,为首要推高因子。`,
+    suggestion:
+      row.level === 'high'
+        ? '建议优先安排案头核查,重点比对发票与申报数据的一致性。'
+        : row.level === 'mid'
+          ? '建议纳入观察名单,下期评分后再决定是否派发核查任务。'
+          : '当前分值处于正常区间,暂不建议派发核查任务。',
+  }
+}
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
@@ -1308,6 +1522,103 @@ export const mockClient: ApiClient = {
             ]
           : [],
       })
+    },
+  },
+
+  /* ==================== 智能模型 · 风险评分模型 ==================== */
+  model: {
+    getScoreModelState(): Promise<ScoreModelState> {
+      return delay({
+        info: {
+          name: '纳税人综合风险评分模型',
+          version: 'v3.2.1',
+          algorithm: 'XGBoost(梯度提升树)',
+          trainedAt: '2026-07-05 02:30',
+          publishedAt: '2026-07-08 09:00',
+          sampleCount: 128460,
+          positiveRate: 8.6,
+          featureCount: 66,
+          nextTrainAt: '2026-10-05',
+          baseScore: SCORE_BASE,
+          metrics: [
+            { label: 'Precision@200', value: '68.5', unit: '%', accent: 'primary', note: '按分值降序取前 200 户,历史核查查实占比' },
+            { label: 'AUC', value: '0.862', unit: '', accent: 'teal', note: '模型整体区分能力' },
+            { label: 'KS', value: '0.573', unit: '', accent: 'green', note: '正负样本最大分离度' },
+            { label: 'Recall@10%', value: '41.8', unit: '%', accent: 'gold', note: '前 10% 覆盖的查实户占全部查实户比例' },
+          ],
+        },
+        // 基准查实率 12.4%,lift = 该分位查实率 / 基准查实率
+        lift: [
+          { percentile: 5, lift: 6.4, precision: 79.4 },
+          { percentile: 10, lift: 5.2, precision: 64.5 },
+          { percentile: 20, lift: 3.8, precision: 47.1 },
+          { percentile: 30, lift: 2.9, precision: 36.0 },
+          { percentile: 40, lift: 2.4, precision: 29.8 },
+          { percentile: 50, lift: 2.0, precision: 24.8 },
+          { percentile: 60, lift: 1.7, precision: 21.1 },
+          { percentile: 70, lift: 1.5, precision: 18.6 },
+          { percentile: 80, lift: 1.3, precision: 16.1 },
+          { percentile: 90, lift: 1.15, precision: 14.3 },
+          { percentile: 100, lift: 1.0, precision: 12.4 },
+        ],
+        features: FEATURES.map((f) => ({ name: f.name, dimension: f.dim, weight: f.weight })),
+      })
+    },
+
+    getScoreFilters(): Promise<ScoreFilters> {
+      const count = (lv: RiskLevel) => SCORE_DATA.filter((r) => r.level === lv).length
+      return delay({
+        updatedAt: '2026-07-24 03:20',
+        districts: [{ value: 'all', label: '全部区县' }].concat(
+          Object.keys(DISTRICT_CN).map((code) => ({ value: code, label: DISTRICT_CN[code] })),
+        ),
+        industries: [{ value: 'all', label: '全部行业' }].concat(
+          INDUSTRY_CODES.map((code) => ({ value: code, label: INDUSTRY_CN[code] })),
+        ),
+        levels: [
+          { value: 'high', label: '高风险(≥80)', count: count('high') },
+          { value: 'mid', label: '中风险(60–79)', count: count('mid') },
+          { value: 'low', label: '低风险(<60)', count: count('low') },
+        ],
+        kpis: [
+          { label: '本期评分户数', value: '12,486', unit: '户', accent: 'primary' },
+          { label: '高风险户数', value: '268', unit: '户', accent: 'red' },
+          { label: '较上期新增高风险', value: '42', unit: '户', accent: 'gold' },
+          { label: '已转风险线索', value: '137', unit: '条', accent: 'teal' },
+        ],
+      })
+    },
+
+    getScores(query: ScoreQuery): Promise<PagedResult<ScoreRow>> {
+      const kw = query.keyword.trim()
+      const filtered = SCORE_DATA.filter((r) => {
+        if (kw && r.taxpayerName.indexOf(kw) < 0 && r.taxId.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+        if (query.districtCode !== 'all' && DISTRICT_CODE_BY_CN[r.district] !== query.districtCode) return false
+        if (query.industryCode !== 'all' && INDUSTRY_CODE_BY_CN[r.industry] !== query.industryCode) return false
+        if (query.levels.length && query.levels.indexOf(r.level) < 0) return false
+        if (query.scoreMin !== null && r.score < query.scoreMin) return false
+        if (query.scoreMax !== null && r.score > query.scoreMax) return false
+        return true
+      })
+      // 服务端排序:分页数据必须先排序再切片,否则翻页结果不正确
+      const dir = query.sortDir
+      const sorted = filtered.slice().sort((a, b) => {
+        if (query.sortKey === 'percentile') return (a.percentile - b.percentile) * dir
+        if (query.sortKey === 'delta') return (parseFloat(a.delta) - parseFloat(b.delta)) * dir
+        return (a.score - b.score) * dir
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: sorted.slice(start, start + query.pageSize),
+        total: sorted.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getScoreAttribution(taxId: string): Promise<ScoreAttribution> {
+      const row = SCORE_DATA.filter((r) => r.taxId === taxId)[0] || SCORE_DATA[0]
+      return delay(buildAttribution(row))
     },
   },
 

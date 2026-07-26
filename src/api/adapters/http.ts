@@ -56,6 +56,11 @@ import type {
   RuleFilters,
   RuleQuery,
   RuleRow,
+  ScoreAttribution,
+  ScoreFilters,
+  ScoreModelState,
+  ScoreQuery,
+  ScoreRow,
   SourceContribution,
   TaxTypeStructure,
 } from '../types'
@@ -208,6 +213,33 @@ export const httpClient: ApiClient = {
   graph: {
     getGraph(rootId: string): Promise<GraphData> {
       return get<GraphData>('/graph', { rootId })
+    },
+  },
+
+  model: {
+    getScoreModelState(): Promise<ScoreModelState> {
+      return get<ScoreModelState>('/model/score/state')
+    },
+    getScoreFilters(): Promise<ScoreFilters> {
+      return get<ScoreFilters>('/model/score/filters')
+    },
+    getScores(query: ScoreQuery): Promise<PagedResult<ScoreRow>> {
+      return get<PagedResult<ScoreRow>>('/model/score', {
+        keyword: query.keyword,
+        districtCode: query.districtCode,
+        industryCode: query.industryCode,
+        // 数组条件以逗号分隔传递
+        levels: query.levels.join(','),
+        scoreMin: query.scoreMin === null ? undefined : query.scoreMin,
+        scoreMax: query.scoreMax === null ? undefined : query.scoreMax,
+        sortKey: query.sortKey,
+        sortDir: query.sortDir,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getScoreAttribution(taxId: string): Promise<ScoreAttribution> {
+      return get<ScoreAttribution>(`/model/score/${encodeURIComponent(taxId)}/attribution`)
     },
   },
 

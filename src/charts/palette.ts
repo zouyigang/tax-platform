@@ -150,6 +150,24 @@ export const DECISION = {
   posText: '#1E7F4F',
 }
 
+/** 智能模型·Lift 曲线配色(SVG 不能消费 CSS 变量,故与图表同置此处) */
+export const MODEL = {
+  /** 模型 Lift 曲线 */
+  lift: '#1D5A99',
+  /** 随机基准线(lift = 1.0) */
+  baseline: '#97A3B0',
+  /** 网格线 */
+  grid: '#EAEEF3',
+  /** 坐标轴刻度文字 */
+  axis: '#97A3B0',
+  /** 标注点(Precision@200 对应分位) */
+  mark: '#C0392B',
+  /** 数据点圆心填充 */
+  symbolFill: '#FFFFFF',
+  /** 曲线下方面积透明度 */
+  areaOpacity: 0.07,
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

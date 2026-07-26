@@ -1996,6 +1996,190 @@ export interface RuleOpsApi {
 }
 
 /* ========================================================================
+ * 十一、智能模型（Model）· 风险评分模型
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》4.3.1 风险评分模型。
+ * 页面分「模型态」与「结果态」两层:
+ *   模型态 —— 版本、训练信息、Lift 曲线、特征重要性(可解释性的全局视角);
+ *   结果态 —— 纳税人评分排序清单 + 单户 SHAP 归因(可解释性的个体视角)。
+ * 注:关联图谱分析虽同属「智能模型」菜单,但接口历史上单列在 graph 分组。
+ * 重要约束:模型输出仅用于风险提示与线索排序,不作为税务定性依据,
+ *          故所有结果类接口都必须能配套返回归因(getScoreAttribution)。
+ * ====================================================================== */
+
+/** 评分模型版本与训练信息 */
+export interface ScoreModelInfo {
+  /** 模型名称 */
+  name: string
+  /** 版本号 */
+  version: string
+  /** 算法 */
+  algorithm: string
+  /** 训练完成时间 */
+  trainedAt: string
+  /** 上线时间 */
+  publishedAt: string
+  /** 训练样本量(户) */
+  sampleCount: number
+  /** 正样本(历史查实户)占比,百分数 */
+  positiveRate: number
+  /** 入模特征总数 */
+  featureCount: number
+  /** 下次计划重训时间 */
+  nextTrainAt: string
+  /** 评分基准分(全样本平均分,SHAP 归因的基线) */
+  baseScore: number
+  /** 模型效果指标(Precision@200 / AUC / KS 等) */
+  metrics: Array<MetricItem & { accent: KpiAccent; note: string }>
+}
+
+/** Lift 曲线上的一个分位点 */
+export interface LiftPoint {
+  /** 按风险分降序的累计覆盖分位,百分数(如 10 = 前 10%) */
+  percentile: number
+  /** 该分位的累计提升度(倍数;1.0 为随机基准) */
+  lift: number
+  /** 该分位的累计查实率,百分数 */
+  precision: number
+}
+
+/** 特征重要性(全局解释) */
+export interface FeatureImportance {
+  /** 特征名称 */
+  name: string
+  /** 特征所属维度(发票 / 申报 / 税负 …) */
+  dimension: string
+  /** 归一化重要性,百分数(全部特征合计 100) */
+  weight: number
+}
+
+/** 风险评分模型·模型态 */
+export interface ScoreModelState {
+  /** 版本与训练信息 */
+  info: ScoreModelInfo
+  /** Lift 曲线(按分位升序) */
+  lift: LiftPoint[]
+  /** 特征重要性 TOP20(按重要性降序) */
+  features: FeatureImportance[]
+}
+
+/** 风险评分结果行 */
+export interface ScoreRow {
+  /** 全局排名(按风险分降序,与当前排序方式无关) */
+  rank: number
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 所属区县 */
+  district: string
+  /** 所属行业 */
+  industry: string
+  /** 风险分(0–100) */
+  score: number
+  /** 风险等级(由分值分档) */
+  level: RiskLevel
+  /** 所处分位,百分数(如 1.2 = 前 1.2%) */
+  percentile: number
+  /** 较上期分值变化(带符号,如 "+6.4") */
+  delta: string
+  /** 分值变化语义(升高=风险恶化,故 negative 表示分值上升) */
+  deltaTone: DeltaTone
+  /** 主要驱动因子(SHAP 绝对值最大的前 2 项特征名) */
+  topFactors: string[]
+  /** 是否已生成风险线索 */
+  hasClue: boolean
+}
+
+/** 风险评分结果·查询参数 */
+export interface ScoreQuery {
+  /** 纳税人名称 / 识别号关键字 */
+  keyword: string
+  /** 区县编码;'all' 不限 */
+  districtCode: string
+  /** 行业编码;'all' 不限 */
+  industryCode: string
+  /** 风险等级多选;空数组不限 */
+  levels: RiskLevel[]
+  /** 风险分下限;null 不限 */
+  scoreMin: number | null
+  /** 风险分上限;null 不限 */
+  scoreMax: number | null
+  /** 排序字段(score / percentile / delta) */
+  sortKey: string
+  /** 排序方向:1 升序 / -1 降序 */
+  sortDir: 1 | -1
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 风险评分结果·筛选项与概览 */
+export interface ScoreFilters {
+  /** 评分批次时间 */
+  updatedAt: string
+  /** 区县选项(含「全部区县」) */
+  districts: FilterOption[]
+  /** 行业选项(含「全部行业」) */
+  industries: FilterOption[]
+  /** 风险等级选项(附计数) */
+  levels: Array<FilterOption & { count: number }>
+  /** 结果态概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** SHAP 单项贡献(个体解释) */
+export interface ShapItem {
+  /** 特征名称 */
+  feature: string
+  /** 该纳税人在此特征上的取值(已格式化,含单位) */
+  value: string
+  /** 同行业中位数参考值(已格式化,含单位) */
+  benchmark: string
+  /** SHAP 贡献值:正=推高风险分,负=压低风险分 */
+  contribution: number
+}
+
+/** 风险评分归因(单户) */
+export interface ScoreAttribution {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 风险分 */
+  score: number
+  /** 风险等级 */
+  level: RiskLevel
+  /** 所处分位,百分数 */
+  percentile: number
+  /** 模型基准分(SHAP 基线) */
+  baseScore: number
+  /** 推高项贡献合计 */
+  positiveSum: number
+  /** 压低项贡献合计(负数) */
+  negativeSum: number
+  /** 贡献最大的 10 项(按绝对值降序) */
+  items: ShapItem[]
+  /** 归因结论(一句话) */
+  summary: string
+  /** 建议动作 */
+  suggestion: string
+}
+
+/** 智能模型接口分组 */
+export interface ModelApi {
+  /** 风险评分模型·模型态(版本 / Lift / 特征重要性) */
+  getScoreModelState(): Promise<ScoreModelState>
+  /** 风险评分结果·筛选项与概览 */
+  getScoreFilters(): Promise<ScoreFilters>
+  /** 风险评分结果·列表(服务端排序 + 分页) */
+  getScores(query: ScoreQuery): Promise<PagedResult<ScoreRow>>
+  /** 风险评分归因·单户 SHAP 明细 */
+  getScoreAttribution(taxId: string): Promise<ScoreAttribution>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -2011,6 +2195,8 @@ export interface ApiClient {
   qa: QaApi
   /** 智能模型 · 关联图谱分析 */
   graph: GraphApi
+  /** 智能模型 · 风险评分模型 */
+  model: ModelApi
   /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
   decision: DecisionApi
   /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */

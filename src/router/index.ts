@@ -25,6 +25,7 @@ import EntityMatchView from '@/views/datagov/EntityMatchView.vue'
 import DispatchView from '@/views/riskmgmt/DispatchView.vue'
 import BackfillView from '@/views/riskmgmt/BackfillView.vue'
 import PerformanceView from '@/views/riskmgmt/PerformanceView.vue'
+import ScoreView from '@/views/model/ScoreView.vue'
 import TrialView from '@/views/ruleops/TrialView.vue'
 import ThresholdView from '@/views/ruleops/ThresholdView.vue'
 import EffectMonitorView from '@/views/ruleops/EffectMonitorView.vue'
@@ -39,6 +40,7 @@ const DONE_VIEWS: Record<string, Component> = {
   archive: ArchiveView,
   'rules-config': RuleConfigView,
   'app-qa': QaView,
+  'model-score': ScoreView,
   'model-graph': GraphView,
   'decision-revenue': RevenueAnalysisView,
   'decision-tax-source': TaxSourceAnalysisView,

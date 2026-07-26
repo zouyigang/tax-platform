@@ -14,8 +14,10 @@ const props = withDefaults(
     unit?: string
     /** 是否按排名着色(第1名最深,前3主色,其余浅蓝) */
     rankColor?: boolean
+    /** 名称列宽度;名称较长时(如特征名)可加宽 */
+    nameWidth?: string
   }>(),
-  { unit: '', rankColor: true },
+  { unit: '', rankColor: true, nameWidth: '72px' },
 )
 
 const max = computed(() => props.items.reduce((m, i) => (i.value > m ? i.value : m), 0) || 1)
@@ -34,7 +36,7 @@ function fmt(v: number) {
 <template>
   <div class="hbar">
     <div v-for="(item, i) in items" :key="item.name" class="hbar__row">
-      <span class="hbar__name">{{ item.name }}</span>
+      <span class="hbar__name" :style="{ width: nameWidth }">{{ item.name }}</span>
       <div class="hbar__track">
         <div class="hbar__fill" :style="{ width: width(item.value), background: color(i) }"></div>
       </div>
@@ -58,7 +60,7 @@ function fmt(v: number) {
   gap: var(--space-3);
 }
 .hbar__name {
-  width: 72px;
+  /* 宽度由 nameWidth 属性行内给出(默认 72px) */
   flex: none;
   text-align: right;
   font-size: var(--fs-label);

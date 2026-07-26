@@ -168,12 +168,7 @@ export const MENU: MenuEntry[] = [
         key: 'model-score',
         title: '风险评分模型',
         path: '/model/score',
-        status: 'placeholder',
-        desc: [
-          '基于机器学习对纳税人进行综合风险评分与分级。',
-          '展示评分分布、特征贡献度与模型版本效果。',
-          '对应需求 4.3.1 风险评分模型。',
-        ],
+        status: 'done',
       },
       {
         key: 'model-graph',
