@@ -446,6 +446,11 @@ const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 
   flex-direction: column;
   gap: var(--space-3);
 }
+/* 可滚动的纵向 flex 容器:所有直接子项一律不收缩。
+   PanelCard 自带 min-height:0,不加这条会在内容超出视口时被压扁到只剩标题栏。 */
+.ks__body > * {
+  flex: none;
+}
 .ks__kpis {
   flex: none;
   display: grid;
@@ -744,12 +749,11 @@ const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 
   color: var(--color-neutral-600);
   flex: none;
 }
+/* 支撑数据是判断依据,宁可折行也不截断 */
 .ev__value {
   color: var(--color-neutral-800);
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.5;
 }
 .cz__warn {
   margin: var(--space-3) 0 0;
