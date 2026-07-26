@@ -186,12 +186,7 @@ export const MENU: MenuEntry[] = [
         key: 'model-abnormal-declare',
         title: '异常申报检测',
         path: '/model/abnormal-declare',
-        status: 'placeholder',
-        desc: [
-          '检测申报数据中的逻辑异常、突变与同行业偏离。',
-          '对零申报、长期亏损、税负异常等模式自动预警。',
-          '对应需求 4.3.3 异常申报识别。',
-        ],
+        status: 'done',
       },
       {
         key: 'model-industry-benchmark',

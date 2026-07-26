@@ -6,8 +6,17 @@
  * 禁止被页面组件直接引用,只能经由 src/api/client.ts。
  * ============================================================ */
 import type {
+  AbnormalChart,
+  AbnormalDetail,
+  AbnormalFilters,
+  AbnormalQuery,
+  AbnormalRow,
   ApiClient,
   ArchiveDeclare,
+  DeviationDirection,
+  DeviationItem,
+  ParallelDimension,
+  ParallelSample,
   ArchiveEvaluation,
   ArchiveInvoice,
   ArchiveSummary,
@@ -693,6 +702,191 @@ const GANG_DATA: GangRow[] = GANG_SEED.map((seed, gi) => {
     status: seed.status,
   }
 })
+
+/* ==================== 智能模型:异常申报检测演示数据 ==================== */
+
+/** 确定性伪随机(同一 seed 每次返回同一值,保证演示数据稳定) */
+function rand(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
+/** 近似正态(三次均匀分布求平均,范围约 ±1.5) */
+function gauss(seed: number): number {
+  return (rand(seed) + rand(seed + 101) + rand(seed + 307) - 1.5) * 2
+}
+
+/** 检测维度基线(各行业在此基础上做整体平移) */
+const ABN_DIM_BASE: Array<{
+  key: string
+  name: string
+  unit: string
+  median: number
+  std: number
+  dec: number
+  /** 偏高为异常(false 表示偏低为异常) */
+  highIsRisk: boolean
+  noteHigh: string
+  noteLow: string
+}> = [
+  { key: 'burden', name: '增值税税负率', unit: '%', median: 3.2, std: 0.85, dec: 2, highIsRisk: false, noteHigh: '税负高于同业,通常非风险信号', noteLow: '税负显著低于同业,需核查是否少计销项或虚增进项' },
+  { key: 'margin', name: '毛利率', unit: '%', median: 18.5, std: 5.0, dec: 1, highIsRisk: false, noteHigh: '毛利率高于同业,关注收入成本配比是否真实', noteLow: '毛利率远低于同业,关注是否隐匿收入或虚列成本' },
+  { key: 'ioRatio', name: '进项占销项比', unit: '%', median: 82.0, std: 6.0, dec: 1, highIsRisk: true, noteHigh: '进项占比过高,关注是否取得虚开进项发票', noteLow: '进项占比偏低,可能存在未取得合规凭证' },
+  { key: 'perCapita', name: '人均产值', unit: '万元', median: 96, std: 26, dec: 0, highIsRisk: true, noteHigh: '人均产值远超同业,与用工规模不匹配', noteLow: '人均产值偏低,关注用工与产能的真实性' },
+  { key: 'expRatio', name: '费用收入比', unit: '%', median: 12.4, std: 3.4, dec: 1, highIsRisk: true, noteHigh: '费用收入比异常偏高,关注费用列支合规性', noteLow: '费用收入比偏低,关注是否存在账外经营' },
+  { key: 'turnover', name: '存货周转天数', unit: '天', median: 62, std: 20, dec: 0, highIsRisk: true, noteHigh: '存货周转显著变慢,关注存货真实性', noteLow: '存货周转异常快,关注是否存在无货虚开' },
+  { key: 'zeroRatio', name: '零申报月占比', unit: '%', median: 4.0, std: 4.0, dec: 1, highIsRisk: true, noteHigh: '零申报月份占比过高,关注是否实际停业或隐匿收入', noteLow: '正常申报,无零申报异常' },
+]
+
+/** 单个行业的检测结果(维度 + 样本 + 离群企业) */
+interface AbnIndustryData {
+  dimensions: ParallelDimension[]
+  samples: ParallelSample[]
+  /** 离群企业的维度偏离明细,键为识别号 */
+  details: Record<string, AbnormalDetail>
+  rows: AbnormalRow[]
+}
+
+const ABN_CACHE: Record<string, AbnIndustryData> = {}
+
+/**
+ * 构造某行业的样本分布
+ * 背景样本(脱敏)围绕行业中位数正态分布;离群企业取自评分样本集中同行业的户,
+ * 在 3 个维度上强制偏离 2.2–3.4 个标准差,使其在平行坐标上一眼可辨。
+ */
+function buildAbnormalIndustry(industryCode: string): AbnIndustryData {
+  const ii = INDUSTRY_CODES.indexOf(industryCode)
+  const industryName = INDUSTRY_CN[industryCode]
+  // 行业整体平移系数:不同行业的中位数水平本就不同
+  const shift = 1 + (ii - 2.5) * 0.07
+
+  const dims: ParallelDimension[] = ABN_DIM_BASE.map((d) => {
+    const median = +(d.median * shift).toFixed(d.dec)
+    const std = +(d.std * shift).toFixed(3)
+    return {
+      key: d.key,
+      name: d.name,
+      unit: d.unit,
+      median,
+      min: +Math.max(0, median - std * 3.6).toFixed(d.dec),
+      max: +(median + std * 3.6).toFixed(d.dec),
+      decimals: d.dec,
+    }
+  })
+  const stds = ABN_DIM_BASE.map((d) => d.std * shift)
+
+  const samples: ParallelSample[] = []
+
+  // ① 背景样本:同行业正常分布,已脱敏
+  for (let i = 0; i < 52; i++) {
+    const values: Record<string, number> = {}
+    dims.forEach((dim, di) => {
+      const v = dim.median + stds[di] * gauss(ii * 977 + i * 31 + di * 7)
+      values[dim.key] = +Math.max(0, v).toFixed(dim.decimals)
+    })
+    samples.push({
+      taxId: `bg-${industryCode}-${i}`,
+      name: `同业样本 ${String(i + 1).padStart(2, '0')}`,
+      values,
+      outlier: false,
+      score: 0,
+    })
+  }
+
+  // ② 离群企业:取评分样本集中该行业的户,强制在 3 个维度上偏离
+  const members = SCORE_DATA.filter((r) => INDUSTRY_CODE_BY_CN[r.industry] === industryCode)
+  const details: Record<string, AbnormalDetail> = {}
+  const rows: AbnormalRow[] = []
+
+  members.forEach((m, mi) => {
+    const values: Record<string, number> = {}
+    const zs: number[] = []
+    // 每户偏离的维度不同,避免所有离群线重叠成一条
+    const devDims = [(mi * 2) % dims.length, (mi * 2 + 3) % dims.length, (mi * 2 + 5) % dims.length]
+    dims.forEach((dim, di) => {
+      const isDev = devDims.indexOf(di) >= 0
+      const base = ABN_DIM_BASE[di]
+      // 偏离方向朝「异常侧」:highIsRisk 的维度往上偏,反之往下偏
+      const sign = base.highIsRisk ? 1 : -1
+      const z = isDev ? sign * (2.2 + rand(ii * 53 + mi * 17 + di) * 1.2) : gauss(ii * 613 + mi * 41 + di) * 0.8
+      zs.push(z)
+      values[dim.key] = +Math.max(0, dim.median + stds[di] * z).toFixed(dim.decimals)
+    })
+
+    // 异常度:三个偏离维度的平均偏离程度归一到 0–100
+    const maxAbs = devDims.reduce((s, di) => s + Math.abs(zs[di]), 0) / 3
+    const score = +Math.min(99.5, 45 + maxAbs * 16).toFixed(1)
+    const level: RiskLevel = score >= 85 ? 'high' : score >= 70 ? 'mid' : 'low'
+
+    samples.push({ taxId: m.taxId, name: m.taxpayerName, values, outlier: true, score })
+
+    const items: DeviationItem[] = dims
+      .map((dim, di) => {
+        const base = ABN_DIM_BASE[di]
+        const z = zs[di]
+        const direction: DeviationDirection = Math.abs(z) < 1 ? 'normal' : z > 0 ? 'high' : 'low'
+        // 正态近似:z=0 → 50 分位,每 1 个标准差约 34 个分位
+        const percentile = +Math.max(0.5, Math.min(99.5, 50 + z * 34)).toFixed(1)
+        return {
+          key: dim.key,
+          name: dim.name,
+          value: `${values[dim.key].toFixed(dim.decimals)}${dim.unit}`,
+          median: `${dim.median.toFixed(dim.decimals)}${dim.unit}`,
+          percentile,
+          z: +z.toFixed(2),
+          direction,
+          note: direction === 'normal' ? '处于同业正常区间' : z > 0 ? base.noteHigh : base.noteLow,
+        }
+      })
+      .sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
+
+    const period = '2026年6月'
+    details[m.taxId] = {
+      taxId: m.taxId,
+      taxpayerName: m.taxpayerName,
+      industry: industryName,
+      score,
+      level,
+      period,
+      summary: `该户在 ${items.filter((i) => i.direction !== 'normal').length} 个维度上偏离${industryName}同业中位数,其中「${items[0].name}」偏离最大(${items[0].z > 0 ? '高于' : '低于'}中位数 ${Math.abs(items[0].z).toFixed(1)} 个标准差)。`,
+      items,
+      suggestion:
+        level === 'high'
+          ? '建议纳入本期核查名单,结合发票与资金数据核实申报真实性。'
+          : level === 'mid'
+            ? '建议先行风险提示,观察下期申报是否回归同业区间。'
+            : '偏离程度有限,可暂作观察,无需立即介入。',
+    }
+
+    rows.push({
+      rank: 0,
+      taxId: m.taxId,
+      taxpayerName: m.taxpayerName,
+      industry: industryName,
+      score,
+      level,
+      period,
+      topDeviations: items.slice(0, 3).map((i) => ({
+        name: i.name,
+        deviation: `${i.z > 0 ? '高于' : '低于'}同业 ${Math.abs(i.z).toFixed(1)}σ`,
+        direction: i.direction,
+      })),
+    })
+  })
+
+  rows.sort((a, b) => b.score - a.score)
+  rows.forEach((r, i) => {
+    r.rank = i + 1
+  })
+
+  return { dimensions: dims, samples, details, rows }
+}
+
+/** 取(并缓存)某行业的检测结果 */
+function abnormalIndustry(industryCode: string): AbnIndustryData {
+  const code = INDUSTRY_CODES.indexOf(industryCode) >= 0 ? industryCode : INDUSTRY_CODES[2]
+  if (!ABN_CACHE[code]) ABN_CACHE[code] = buildAbnormalIndustry(code)
+  return ABN_CACHE[code]
+}
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
@@ -1878,6 +2072,59 @@ export const mockClient: ApiClient = {
         if (g.id === id) gi = i
       })
       return delay(buildGangDetail(gi))
+    },
+
+    getAbnormalFilters(): Promise<AbnormalFilters> {
+      // 全行业离群户数合计,作为概览口径
+      const allRows = INDUSTRY_CODES.map((c) => abnormalIndustry(c).rows)
+      const flat = allRows.reduce((s: AbnormalRow[], r) => s.concat(r), [])
+      return delay({
+        updatedAt: '2026-07-24 05:40',
+        industries: INDUSTRY_CODES.map((code) => ({ value: code, label: INDUSTRY_CN[code] })),
+        defaultIndustryCode: 'manufacture',
+        kpis: [
+          { label: '本期检测户数', value: '9,864', unit: '户', accent: 'primary' },
+          { label: '检出离群户', value: String(flat.length), unit: '户', accent: 'red' },
+          { label: '高异常度', value: String(flat.filter((r) => r.level === 'high').length), unit: '户', accent: 'gold' },
+          { label: '对比行业', value: String(INDUSTRY_CODES.length), unit: '个', accent: 'teal' },
+        ],
+      })
+    },
+
+    getAbnormalChart(industryCode: string): Promise<AbnormalChart> {
+      const d = abnormalIndustry(industryCode)
+      return delay({
+        industryName: INDUSTRY_CN[industryCode] || INDUSTRY_CN[INDUSTRY_CODES[2]],
+        sampleCount: d.samples.length,
+        method: '无监督离群检测(Isolation Forest + 分位偏离),不使用历史查实标签训练',
+        dimensions: d.dimensions,
+        samples: d.samples,
+      })
+    },
+
+    getAbnormals(query: AbnormalQuery): Promise<PagedResult<AbnormalRow>> {
+      const kw = query.keyword.trim()
+      const filtered = abnormalIndustry(query.industryCode).rows.filter((r) => {
+        if (kw && r.taxpayerName.indexOf(kw) < 0 && r.taxId.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+        return true
+      })
+      const sorted = filtered.slice().sort((a, b) => (a.score - b.score) * query.sortDir)
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: sorted.slice(start, start + query.pageSize),
+        total: sorted.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getAbnormalDetail(taxId: string): Promise<AbnormalDetail> {
+      for (let i = 0; i < INDUSTRY_CODES.length; i++) {
+        const hit = abnormalIndustry(INDUSTRY_CODES[i]).details[taxId]
+        if (hit) return delay(hit)
+      }
+      const fallback = abnormalIndustry(INDUSTRY_CODES[2])
+      return delay(fallback.details[fallback.rows[0].taxId])
     },
   },
 

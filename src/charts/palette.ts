@@ -168,6 +168,28 @@ export const MODEL = {
   areaOpacity: 0.07,
 }
 
+/** 智能模型·平行坐标配色(异常申报检测) */
+export const PARALLEL = {
+  /** 背景同业样本线 */
+  sample: '#8FA6BC',
+  sampleOpacity: 0.2,
+  /** 其他离群样本线 */
+  outlier: '#C9A227',
+  outlierOpacity: 0.5,
+  /** 当前选中企业(加粗高亮) */
+  highlight: '#C0392B',
+  /** 行业中位数连线(虚线) */
+  median: '#5A7189',
+  /** 纵轴 */
+  axis: '#D8DEE6',
+  /** 轴名文字 */
+  axisText: '#4C5A68',
+  /** 刻度文字 */
+  tickText: '#97A3B0',
+  /** 高亮线上的数据点填充 */
+  dotFill: '#FFFFFF',
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

@@ -6,6 +6,11 @@
  * 禁止被页面组件直接引用,只能经由 src/api/client.ts。
  * ============================================================ */
 import type {
+  AbnormalChart,
+  AbnormalDetail,
+  AbnormalFilters,
+  AbnormalQuery,
+  AbnormalRow,
   ApiClient,
   ArchiveDeclare,
   ArchiveEvaluation,
@@ -262,6 +267,25 @@ export const httpClient: ApiClient = {
     },
     getGangDetail(id: string): Promise<GangDetail> {
       return get<GangDetail>(`/model/gang/${encodeURIComponent(id)}`)
+    },
+    getAbnormalFilters(): Promise<AbnormalFilters> {
+      return get<AbnormalFilters>('/model/abnormal/filters')
+    },
+    getAbnormalChart(industryCode: string): Promise<AbnormalChart> {
+      return get<AbnormalChart>('/model/abnormal/chart', { industryCode })
+    },
+    getAbnormals(query: AbnormalQuery): Promise<PagedResult<AbnormalRow>> {
+      return get<PagedResult<AbnormalRow>>('/model/abnormal', {
+        keyword: query.keyword,
+        industryCode: query.industryCode,
+        sortKey: query.sortKey,
+        sortDir: query.sortDir,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getAbnormalDetail(taxId: string): Promise<AbnormalDetail> {
+      return get<AbnormalDetail>(`/model/abnormal/${encodeURIComponent(taxId)}`)
     },
   },
 

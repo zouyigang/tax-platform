@@ -2288,6 +2288,162 @@ export interface GangDetail {
   evidences: GangEvidence[]
 }
 
+/* ------------------------------------------------------------------------
+ * 智能模型 · 异常申报检测(《需求文档》4.3.3)
+ * 与风险评分模型的本质区别:这是**无监督离群检测**,不使用历史查实标签训练,
+ * 表达的是「该户在同行群体中的位置有多偏」,而不是「该户有多像历史问题户」。
+ * 因此:
+ *   - 对比基准是行业(切换行业即换一套样本分布),跨行业比较无意义;
+ *   - 主可视化是平行坐标(多维同时看偏离),不是分值排序;
+ *   - 归因是「各维度所处分位与偏离倍数」,不是特征贡献值。
+ * ---------------------------------------------------------------------- */
+
+/** 偏离方向:高于同业 / 低于同业 / 处于正常区间 */
+export type DeviationDirection = 'high' | 'low' | 'normal'
+
+/** 平行坐标的一个维度(纵轴) */
+export interface ParallelDimension {
+  /** 维度键 */
+  key: string
+  /** 维度名称 */
+  name: string
+  /** 单位 */
+  unit: string
+  /** 轴下端取值(同行业样本最小值) */
+  min: number
+  /** 轴上端取值(同行业样本最大值) */
+  max: number
+  /** 同行业中位数(画基准虚线) */
+  median: number
+  /** 小数位数(展示用) */
+  decimals: number
+}
+
+/** 平行坐标的一条样本线 */
+export interface ParallelSample {
+  /** 纳税人识别号;背景样本为脱敏占位 */
+  taxId: string
+  /** 展示名称;背景样本已脱敏 */
+  name: string
+  /** 各维度取值,键为 ParallelDimension.key */
+  values: Record<string, number>
+  /** 是否被判定为离群样本(加深显示) */
+  outlier: boolean
+  /** 异常度评分(0–100) */
+  score: number
+}
+
+/** 异常申报检测·平行坐标数据 */
+export interface AbnormalChart {
+  /** 行业名称(对比基准) */
+  industryName: string
+  /** 参与对比的同行业样本数 */
+  sampleCount: number
+  /** 检测方法说明(注明为无监督,不依赖历史查实标签) */
+  method: string
+  /** 维度定义(纵轴,自左向右) */
+  dimensions: ParallelDimension[]
+  /** 样本线 */
+  samples: ParallelSample[]
+}
+
+/** 异常申报·列表行 */
+export interface AbnormalRow {
+  /** 行业内异常度排名 */
+  rank: number
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 所属行业 */
+  industry: string
+  /** 异常度评分(0–100) */
+  score: number
+  /** 异常等级(由评分分档) */
+  level: RiskLevel
+  /** 申报所属期 */
+  period: string
+  /** 偏离最大的三个维度 */
+  topDeviations: Array<{
+    /** 维度名称 */
+    name: string
+    /** 偏离描述(如 "高于同业 2.8 倍标准差") */
+    deviation: string
+    /** 偏离方向 */
+    direction: DeviationDirection
+  }>
+}
+
+/** 异常申报·查询参数 */
+export interface AbnormalQuery {
+  /** 纳税人名称 / 识别号关键字 */
+  keyword: string
+  /** 行业编码(对比基准,不可为 all —— 跨行业比较无意义) */
+  industryCode: string
+  /** 排序字段(score) */
+  sortKey: string
+  /** 排序方向:1 升序 / -1 降序 */
+  sortDir: 1 | -1
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 异常申报·筛选项与概览 */
+export interface AbnormalFilters {
+  /** 检测批次时间 */
+  updatedAt: string
+  /** 行业选项(对比基准,无「全部行业」项) */
+  industries: FilterOption[]
+  /** 默认行业编码 */
+  defaultIndustryCode: string
+  /** 概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 单维度偏离明细 */
+export interface DeviationItem {
+  /** 维度键(与平行坐标维度对应) */
+  key: string
+  /** 维度名称 */
+  name: string
+  /** 本企业取值(已格式化,含单位) */
+  value: string
+  /** 同行业中位数(已格式化,含单位) */
+  median: string
+  /** 在同行业中所处分位(百分数,50 为中位) */
+  percentile: number
+  /** 偏离倍数(标准差倍数,带符号) */
+  z: number
+  /** 偏离方向 */
+  direction: DeviationDirection
+  /** 该维度的业务解读 */
+  note: string
+}
+
+/** 异常申报·单户归因 */
+export interface AbnormalDetail {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  taxpayerName: string
+  /** 所属行业 */
+  industry: string
+  /** 异常度评分 */
+  score: number
+  /** 异常等级 */
+  level: RiskLevel
+  /** 申报所属期 */
+  period: string
+  /** 一句话结论 */
+  summary: string
+  /** 各维度偏离明细(按偏离绝对值降序) */
+  items: DeviationItem[]
+  /** 建议动作 */
+  suggestion: string
+}
+
 /** 智能模型接口分组 */
 export interface ModelApi {
   /** 风险评分模型·模型态(版本 / Lift / 特征重要性) */
@@ -2304,6 +2460,14 @@ export interface ModelApi {
   getGangs(query: GangQuery): Promise<PagedResult<GangRow>>
   /** 虚开团伙·下钻详情(子图 + 成员 + 认定依据) */
   getGangDetail(id: string): Promise<GangDetail>
+  /** 异常申报·筛选项与概览 */
+  getAbnormalFilters(): Promise<AbnormalFilters>
+  /** 异常申报·某行业的平行坐标样本分布 */
+  getAbnormalChart(industryCode: string): Promise<AbnormalChart>
+  /** 异常申报·离群企业列表(服务端排序 + 分页) */
+  getAbnormals(query: AbnormalQuery): Promise<PagedResult<AbnormalRow>>
+  /** 异常申报·单户维度偏离归因 */
+  getAbnormalDetail(taxId: string): Promise<AbnormalDetail>
 }
 
 /* ========================================================================
