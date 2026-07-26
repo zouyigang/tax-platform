@@ -263,6 +263,31 @@ export const FORECAST = {
   devBandOpacity: 0.08,
 }
 
+/** 税源监控·新办企业四象限配色 */
+export const QUADRANT = {
+  /** 四象限气泡:重点培育 / 观察 / 正常 / 疑似空壳 */
+  cultivate: '#2E8757',
+  watch: '#D98A24',
+  normal: '#5A7189',
+  shell: '#C0392B',
+  /** 象限底纹(仅「疑似空壳」着色,其余留白避免花) */
+  shellBg: '#C0392B',
+  shellBgOpacity: 0.05,
+  /** 选中象限的底纹 */
+  activeBg: '#1D5A99',
+  activeBgOpacity: 0.06,
+  /** 分界虚线 */
+  divider: '#B6C0CA',
+  /** 网格 / 轴 / 文字 */
+  grid: '#EAEEF3',
+  axis: '#97A3B0',
+  axisText: '#4C5A68',
+  /** 象限名水印 */
+  watermark: '#97A3B0',
+  /** 选中气泡外环 */
+  ring: '#1C2733',
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

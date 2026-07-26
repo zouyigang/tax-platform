@@ -31,6 +31,7 @@ import AbnormalDeclareView from '@/views/model/AbnormalDeclareView.vue'
 import IndustryBenchmarkView from '@/views/model/IndustryBenchmarkView.vue'
 import KeySourceView from '@/views/taxsource/KeySourceView.vue'
 import ForecastView from '@/views/taxsource/ForecastView.vue'
+import NewEnterpriseView from '@/views/taxsource/NewEnterpriseView.vue'
 import TrialView from '@/views/ruleops/TrialView.vue'
 import ThresholdView from '@/views/ruleops/ThresholdView.vue'
 import EffectMonitorView from '@/views/ruleops/EffectMonitorView.vue'
@@ -52,6 +53,7 @@ const DONE_VIEWS: Record<string, Component> = {
   'model-industry-benchmark': IndustryBenchmarkView,
   'tax-source-key': KeySourceView,
   'tax-source-forecast': ForecastView,
+  'tax-source-new-enterprise': NewEnterpriseView,
   'decision-revenue': RevenueAnalysisView,
   'decision-tax-source': TaxSourceAnalysisView,
   'decision-effectiveness': EffectivenessAnalysisView,

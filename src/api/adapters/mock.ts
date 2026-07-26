@@ -97,6 +97,14 @@ import type {
   KpiCard,
   MetricTrack,
   NamedValue,
+  NewEntDetail,
+  NewEntFilters,
+  NewEntPoint,
+  NewEntQuadrant,
+  NewEntQuery,
+  NewEntRow,
+  PotentialDimension,
+  ShellFeature,
   TaxSourceTier,
   PagedResult,
   QaSession,
@@ -1401,6 +1409,170 @@ function buildForecast(query: ForecastQuery): ForecastBoard {
     summary,
     accuracy,
     details,
+  }
+}
+
+/* ==================== 税源监控:新办企业评估演示数据 ==================== */
+
+/** 象限分界阈值(两轴共用) */
+const NE_THRESHOLD = 50
+
+/** 新办企业名称用的行业词与后缀 */
+const NE_INDUSTRY = [
+  { code: 'wholesale', name: '批发零售', word: '商贸' },
+  { code: 'construction', name: '建筑安装', word: '建设工程' },
+  { code: 'manufacture', name: '制造业', word: '智能制造' },
+  { code: 'realestate', name: '房地产', word: '置业' },
+  { code: 'service', name: '商务服务', word: '企业管理' },
+  { code: 'transport', name: '交通运输', word: '物流' },
+]
+
+/** 空壳特征核对项(五项,与《需求文档》6.3 一致) */
+const NE_SHELL_FEATURES: Array<{ key: string; name: string; hitText: string; missText: string }> = [
+  {
+    key: 'addr',
+    name: '虚拟地址集中注册',
+    hitText: '注册地址与同楼层 14 户新办企业完全一致,为集群注册地址',
+    missText: '注册地址独立,已核验租赁合同',
+  },
+  {
+    key: 'capital',
+    name: '认缴高、实缴为零',
+    hitText: '认缴出资额高但实缴为 0,且认缴期限设定在 20 年以后',
+    missText: '实缴出资已到位,与认缴规模匹配',
+  },
+  {
+    key: 'legal',
+    name: '法人跨省或名下企业过多',
+    hitText: '法定代表人户籍在外省,名下关联企业 7 户,其中 2 户为非正常户',
+    missText: '法定代表人本地户籍,名下无其他关联企业',
+  },
+  {
+    key: 'invoice',
+    name: '成立即申请大额发票',
+    hitText: '登记后 15 日内即申请增值税专用发票最高开票限额上调',
+    missText: '发票申领量与经营规模匹配,未申请限额上调',
+  },
+  {
+    key: 'social',
+    name: '无社保参保',
+    hitText: '成立至今社保参保人数为 0,无工资薪金个税申报记录',
+    missText: '已为 12 名员工缴纳社保,个税申报正常',
+  },
+]
+
+/** 潜力评估维度 */
+const NE_POTENTIAL_DIMS = ['注册资本规模', '行业景气度', '法人过往纳税记录', '经营场所与用工']
+
+/** 象限判定 */
+function neQuadrant(shellRisk: number, potential: number): NewEntQuadrant {
+  if (shellRisk >= NE_THRESHOLD) return potential >= NE_THRESHOLD ? 'watch' : 'shell'
+  return potential >= NE_THRESHOLD ? 'cultivate' : 'normal'
+}
+
+/** 新办企业名录(36 户,登记日期覆盖近半年) */
+interface RawNewEnt extends NewEntRow {
+  industryCode: string
+  legalPerson: string
+  address: string
+  scope: string
+}
+
+const NEW_ENT_DATA: RawNewEnt[] = (() => {
+  const list: RawNewEnt[] = []
+  for (let i = 0; i < 36; i++) {
+    const ind = NE_INDUSTRY[i % NE_INDUSTRY.length]
+    const districtCode = Object.keys(DISTRICT_CN)[i % 6]
+    const districtName = DISTRICT_CN[districtCode]
+    // 登记日期自 2026-07 起逐户回溯,保证时间流有多个日期分组
+    const day = 24 - Math.floor(i * 5.2)
+    const monthOffset = Math.floor((24 - day) / 30)
+    const d = new Date(2026, 6 - monthOffset, ((day % 30) + 30) % 30 || 1)
+    const registerDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+    const shellRisk = +(12 + rand(i * 31) * 82).toFixed(1)
+    const potential = +(10 + rand(i * 47 + 5) * 84).toFixed(1)
+    // 注册资本与潜力正相关,与空壳风险弱负相关(空壳户常见认缴虚高,故不完全单调)
+    const capital = +(80 + potential * 22 + (shellRisk > 60 ? 900 : 0) * rand(i * 11)).toFixed(0)
+
+    list.push({
+      taxId: `91....NE${String(1000 + i)}`,
+      name: `${districtName}某${ind.word}有限公司`,
+      registerDate,
+      industry: ind.name,
+      industryCode: ind.code,
+      district: districtName,
+      capital,
+      shellRisk,
+      potential,
+      quadrant: neQuadrant(shellRisk, potential),
+      legalPerson: ['王×', '李×', '张×', '陈×', '刘×', '赵×'][i % 6],
+      address: `${districtName}${['解放路', '建设大道', '科技园', '临江路', '新兴大道', '工业园'][i % 6]} ${100 + i} 号`,
+      scope: `${ind.name}相关业务、技术咨询、货物及技术进出口`,
+    })
+  }
+  // 时间流按成立日期倒序
+  return list.sort((a, b) => b.registerDate.localeCompare(a.registerDate))
+})()
+
+/** 构造评估详情 */
+function buildNewEntDetail(row: RawNewEnt): NewEntDetail {
+  const idx = NEW_ENT_DATA.indexOf(row)
+  // 命中项数随空壳风险分递增:每项设一个触发门槛,分越高命中越多
+  const gates = [30, 45, 58, 70, 82]
+  const shellFeatures: ShellFeature[] = NE_SHELL_FEATURES.map((f, i) => {
+    const hit = row.shellRisk >= gates[i]
+    return { key: f.key, name: f.name, hit, detail: hit ? f.hitText : f.missText }
+  })
+  const hitCount = shellFeatures.filter((f) => f.hit).length
+
+  const potentialDims: PotentialDimension[] = NE_POTENTIAL_DIMS.map((name, i) => {
+    const score = +Math.max(5, Math.min(98, row.potential + (rand(idx * 19 + i) - 0.5) * 26)).toFixed(0)
+    const notes = [
+      `注册资本 ${money(row.capital)} 万元,在同期新办户中处于${row.capital > 1200 ? '较高' : '中等'}水平`,
+      `${row.industry}近一年入库同比 ${row.potential > 55 ? '+8.2%' : '+1.4%'},景气度${row.potential > 55 ? '较好' : '一般'}`,
+      `法定代表人名下企业${row.shellRisk >= 58 ? '存在非正常户记录' : '纳税信用良好,无欠税记录'}`,
+      `${row.shellRisk >= 30 ? '经营场所为集群注册地址,' : '经营场所独立,'}参保 ${row.shellRisk >= 82 ? 0 : 12} 人`,
+    ]
+    return { name, score, note: notes[i] }
+  })
+
+  const q = row.quadrant
+  return {
+    taxId: row.taxId,
+    name: row.name,
+    shellRisk: row.shellRisk,
+    potential: row.potential,
+    quadrant: q,
+    profile: [
+      { key: '成立日期', value: row.registerDate, numeric: true },
+      { key: '所属行业', value: row.industry, numeric: false },
+      { key: '所属区县', value: row.district, numeric: false },
+      { key: '注册资本', value: `${money(row.capital)} 万元`, numeric: true },
+      { key: '法定代表人', value: row.legalPerson, numeric: false },
+      { key: '注册地址', value: row.address, numeric: false },
+      { key: '纳税人识别号', value: row.taxId, numeric: true },
+      { key: '经营范围', value: row.scope, numeric: false },
+    ],
+    shellFeatures,
+    hitCount,
+    potentialDims,
+    conclusion:
+      q === 'shell'
+        ? `空壳特征命中 ${hitCount}/5 项,税源潜力低,判定为疑似空壳企业。`
+        : q === 'watch'
+          ? `空壳特征命中 ${hitCount}/5 项,但注册资本与行业景气度显示有一定潜力,需进一步核实经营真实性。`
+          : q === 'cultivate'
+            ? `空壳特征命中 ${hitCount}/5 项,经营要素齐备,税源潜力较高。`
+            : `空壳特征命中 ${hitCount}/5 项,各项要素正常,潜力一般。`,
+    suggestion:
+      q === 'shell'
+        ? '建议列入重点核查名单,开展实地核查并暂缓发票增版增量。'
+        : q === 'watch'
+          ? '建议开展开业辅导并核实经营场所,3 个月后重新评估。'
+          : q === 'cultivate'
+            ? '建议纳入重点培育名录,提供政策辅导与办税绿色通道。'
+            : '建议按常规新办户管理,无需专项介入。',
   }
 }
 
@@ -2804,6 +2976,60 @@ export const mockClient: ApiClient = {
 
     getRevenueForecast(query: ForecastQuery): Promise<ForecastBoard> {
       return delay(buildForecast(query))
+    },
+
+    getNewEntFilters(): Promise<NewEntFilters> {
+      const count = (q: NewEntQuadrant) => NEW_ENT_DATA.filter((r) => r.quadrant === q).length
+      return delay({
+        updatedAt: '2026-07-24 07:40',
+        method: '空壳风险分取五项特征加权,税源潜力分取四维度加权;两轴以 50 分为界划分四象限',
+        threshold: NE_THRESHOLD,
+        quadrants: [
+          { key: 'cultivate' as NewEntQuadrant, label: '重点培育', desc: '低空壳风险 · 高税源潜力', count: count('cultivate') },
+          { key: 'watch' as NewEntQuadrant, label: '观察', desc: '高空壳风险 · 高税源潜力', count: count('watch') },
+          { key: 'normal' as NewEntQuadrant, label: '正常', desc: '低空壳风险 · 低税源潜力', count: count('normal') },
+          { key: 'shell' as NewEntQuadrant, label: '疑似空壳', desc: '高空壳风险 · 低税源潜力', count: count('shell') },
+        ],
+        industries: [{ value: 'all', label: '全部行业' }].concat(
+          NE_INDUSTRY.map((i) => ({ value: i.code, label: i.name })),
+        ),
+      })
+    },
+
+    getNewEntScatter(): Promise<NewEntPoint[]> {
+      return delay(
+        NEW_ENT_DATA.map((r) => ({
+          taxId: r.taxId,
+          name: r.name,
+          shellRisk: r.shellRisk,
+          potential: r.potential,
+          capital: r.capital,
+          quadrant: r.quadrant,
+        })),
+      )
+    },
+
+    getNewEnts(query: NewEntQuery): Promise<PagedResult<NewEntRow>> {
+      const kw = query.keyword.trim()
+      const filtered = NEW_ENT_DATA.filter((r) => {
+        if (kw && r.name.indexOf(kw) < 0 && r.taxId.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+        if (query.quadrant !== 'all' && r.quadrant !== query.quadrant) return false
+        if (query.industryCode !== 'all' && r.industryCode !== query.industryCode) return false
+        return true
+      })
+      const start = (query.page - 1) * query.pageSize
+      // 已按成立日期倒序排列,时间流不再另行排序
+      return delay({
+        items: filtered.slice(start, start + query.pageSize),
+        total: filtered.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getNewEntDetail(taxId: string): Promise<NewEntDetail> {
+      const row = NEW_ENT_DATA.filter((r) => r.taxId === taxId)[0] || NEW_ENT_DATA[0]
+      return delay(buildNewEntDetail(row))
     },
   },
 

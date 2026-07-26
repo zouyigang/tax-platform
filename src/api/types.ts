@@ -2923,6 +2923,142 @@ export interface ForecastBoard {
   details: ForecastDetailRow[]
 }
 
+/* ------------------------------------------------------------------------
+ * 税源监控 · 新办企业评估(《需求文档》6.3)
+ * 分类驱动页:先把新办户放进「空壳风险 × 税源潜力」的二维格子里定性,
+ * 再按登记日期以时间流形态逐户看。两个分数轴互相独立 ——
+ * 高潜力不代表低风险,低风险也不代表值得培育,所以必须用象限而不是单一排序。
+ * ---------------------------------------------------------------------- */
+
+/** 新办企业象限:重点培育 / 正常 / 观察 / 疑似空壳 */
+export type NewEntQuadrant = 'cultivate' | 'normal' | 'watch' | 'shell'
+
+/** 象限散点上的一户 */
+export interface NewEntPoint {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 企业名称 */
+  name: string
+  /** 空壳风险分(0–100,横轴;越大越可疑) */
+  shellRisk: number
+  /** 税源潜力分(0–100,纵轴;越大越有培育价值) */
+  potential: number
+  /** 注册资本(万元,映射气泡大小) */
+  capital: number
+  /** 所属象限 */
+  quadrant: NewEntQuadrant
+}
+
+/** 新办企业列表行(时间流) */
+export interface NewEntRow {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 企业名称 */
+  name: string
+  /** 成立日期 */
+  registerDate: string
+  /** 所属行业 */
+  industry: string
+  /** 所属区县 */
+  district: string
+  /** 注册资本(万元) */
+  capital: number
+  /** 空壳风险分 */
+  shellRisk: number
+  /** 税源潜力分 */
+  potential: number
+  /** 所属象限 */
+  quadrant: NewEntQuadrant
+}
+
+/** 象限统计 */
+export interface QuadrantStat {
+  /** 象限键 */
+  key: NewEntQuadrant
+  /** 象限名称 */
+  label: string
+  /** 象限含义(空壳风险与潜力的高低组合) */
+  desc: string
+  /** 户数 */
+  count: number
+}
+
+/** 新办企业·查询参数 */
+export interface NewEntQuery {
+  /** 企业名称 / 识别号关键字 */
+  keyword: string
+  /** 象限过滤;'all' 不限 */
+  quadrant: string
+  /** 行业编码;'all' 不限 */
+  industryCode: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 新办企业·筛选项与概览 */
+export interface NewEntFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 评估口径说明 */
+  method: string
+  /** 象限分界阈值(两轴共用) */
+  threshold: number
+  /** 四象限统计 */
+  quadrants: QuadrantStat[]
+  /** 行业选项(含「全部行业」) */
+  industries: FilterOption[]
+}
+
+/** 空壳特征核对项 */
+export interface ShellFeature {
+  /** 特征键 */
+  key: string
+  /** 特征名称 */
+  name: string
+  /** 是否命中(命中项前端标红) */
+  hit: boolean
+  /** 核对结果说明 */
+  detail: string
+}
+
+/** 潜力评估维度 */
+export interface PotentialDimension {
+  /** 维度名称 */
+  name: string
+  /** 得分(0–100) */
+  score: number
+  /** 评估说明 */
+  note: string
+}
+
+/** 新办企业·评估详情 */
+export interface NewEntDetail {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 企业名称 */
+  name: string
+  /** 空壳风险分 */
+  shellRisk: number
+  /** 税源潜力分 */
+  potential: number
+  /** 所属象限 */
+  quadrant: NewEntQuadrant
+  /** 登记档案摘要 */
+  profile: KeyValue[]
+  /** 空壳特征逐项核对(命中与未命中都列出) */
+  shellFeatures: ShellFeature[]
+  /** 命中项数 */
+  hitCount: number
+  /** 潜力评估维度 */
+  potentialDims: PotentialDimension[]
+  /** 评估结论 */
+  conclusion: string
+  /** 建议动作 */
+  suggestion: string
+}
+
 /** 税源监控接口分组 */
 export interface TaxSourceApi {
   /** 重点税源·筛选项、分档与预警分组 */
@@ -2935,6 +3071,14 @@ export interface TaxSourceApi {
   getForecastFilters(): Promise<ForecastFilters>
   /** 收入预测·主图 / 摘要 / 误差回溯 / 明细 */
   getRevenueForecast(query: ForecastQuery): Promise<ForecastBoard>
+  /** 新办企业·筛选项、象限口径与统计 */
+  getNewEntFilters(): Promise<NewEntFilters>
+  /** 新办企业·象限散点(全量,不随列表分页收窄) */
+  getNewEntScatter(): Promise<NewEntPoint[]>
+  /** 新办企业·时间流列表(按成立日期倒序 + 分页) */
+  getNewEnts(query: NewEntQuery): Promise<PagedResult<NewEntRow>>
+  /** 新办企业·评估详情(空壳特征核对 + 潜力维度) */
+  getNewEntDetail(taxId: string): Promise<NewEntDetail>
 }
 
 /* ========================================================================

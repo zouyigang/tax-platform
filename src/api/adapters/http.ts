@@ -66,6 +66,11 @@ import type {
   KeySourceRow,
   KeyValue,
   KpiCard,
+  NewEntDetail,
+  NewEntFilters,
+  NewEntPoint,
+  NewEntQuery,
+  NewEntRow,
   PagedResult,
   QaSession,
   ForecastBoard,
@@ -263,6 +268,24 @@ export const httpClient: ApiClient = {
         taxType: query.taxType,
         districtCode: query.districtCode,
       })
+    },
+    getNewEntFilters(): Promise<NewEntFilters> {
+      return get<NewEntFilters>('/tax-source/new-enterprise/filters')
+    },
+    getNewEntScatter(): Promise<NewEntPoint[]> {
+      return get<NewEntPoint[]>('/tax-source/new-enterprise/scatter')
+    },
+    getNewEnts(query: NewEntQuery): Promise<PagedResult<NewEntRow>> {
+      return get<PagedResult<NewEntRow>>('/tax-source/new-enterprise', {
+        keyword: query.keyword,
+        quadrant: query.quadrant,
+        industryCode: query.industryCode,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getNewEntDetail(taxId: string): Promise<NewEntDetail> {
+      return get<NewEntDetail>(`/tax-source/new-enterprise/${encodeURIComponent(taxId)}`)
     },
   },
 

@@ -217,12 +217,7 @@ export const MENU: MenuEntry[] = [
         key: 'tax-source-new-enterprise',
         title: '新办企业评估',
         path: '/tax-source/new-enterprise',
-        status: 'placeholder',
-        desc: [
-          '对新设立纳税人进行开业风险画像与经营真实性评估。',
-          '识别空壳、走逃、注册地异常等早期风险。',
-          '对应需求 6.3 新办企业评估。',
-        ],
+        status: 'done',
       },
     ],
   },
