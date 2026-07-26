@@ -9,6 +9,7 @@ import type {
   DeltaTone,
   GangPattern,
   GangStatus,
+  KeySourceStatus,
   MatchStatus,
   RiskLevel,
   RuleStatus,
@@ -185,4 +186,20 @@ export const GANG_STATUS_LABEL: Record<GangStatus, string> = {
   checking: '核查中',
   confirmed: '已确认',
   excluded: '已排除',
+}
+
+/** 重点税源监控状态 → 语气 */
+export const KEY_STATUS_TONE: Record<KeySourceStatus, ToneName> = {
+  normal: 'success',
+  watch: 'primary',
+  declining: 'warn',
+  alert: 'danger',
+}
+
+/** 重点税源监控状态 → 展示文案 */
+export const KEY_STATUS_LABEL: Record<KeySourceStatus, string> = {
+  normal: '正常',
+  watch: '关注',
+  declining: '下降',
+  alert: '预警',
 }

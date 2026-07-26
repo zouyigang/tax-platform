@@ -58,6 +58,10 @@ import type {
   RevenueAnalysis,
   TaxSourceAnalysis,
   TopicAnalysis,
+  KeySourceDetail,
+  KeySourceFilters,
+  KeySourceQuery,
+  KeySourceRow,
   KeyValue,
   KpiCard,
   PagedResult,
@@ -225,6 +229,27 @@ export const httpClient: ApiClient = {
   graph: {
     getGraph(rootId: string): Promise<GraphData> {
       return get<GraphData>('/graph', { rootId })
+    },
+  },
+
+  taxsource: {
+    getKeySourceFilters(): Promise<KeySourceFilters> {
+      return get<KeySourceFilters>('/tax-source/key/filters')
+    },
+    getKeySources(query: KeySourceQuery): Promise<PagedResult<KeySourceRow>> {
+      return get<PagedResult<KeySourceRow>>('/tax-source/key', {
+        keyword: query.keyword,
+        tier: query.tier,
+        districtCode: query.districtCode,
+        alertType: query.alertType,
+        sortKey: query.sortKey,
+        sortDir: query.sortDir,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+    getKeySourceDetail(taxId: string): Promise<KeySourceDetail> {
+      return get<KeySourceDetail>(`/tax-source/key/${encodeURIComponent(taxId)}`)
     },
   },
 

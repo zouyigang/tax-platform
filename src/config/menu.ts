@@ -205,12 +205,7 @@ export const MENU: MenuEntry[] = [
         key: 'tax-source-key',
         title: '重点税源监控',
         path: '/tax-source/key',
-        status: 'placeholder',
-        desc: [
-          '对重点税源企业进行入库进度、税负变动与经营指标动态监控。',
-          '支持名录管理、异动预警与走访台账。',
-          '对应需求 6.1 重点税源监控。',
-        ],
+        status: 'done',
       },
       {
         key: 'tax-source-forecast',

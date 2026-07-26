@@ -216,6 +216,24 @@ export const BENCH = {
   axisText: '#4C5A68',
 }
 
+/** 税源监控·多指标同步时间轴配色(各轨道一色,便于交叉印证时区分) */
+export const TRACK = {
+  /** 四条轨道依次取色:税额 / 开票量 / 社保人数 / 用电量 */
+  series: ['#1D5A99', '#2E8DA6', '#4E9D6B', '#C9A227'],
+  /** 面积填充透明度 */
+  areaOpacity: 0.1,
+  /** 轨道基线与网格 */
+  grid: '#EAEEF3',
+  /** 悬停竖线 */
+  cursor: '#5A7189',
+  /** 轨道名 / 单位文字 */
+  label: '#4C5A68',
+  /** 刻度文字 */
+  tick: '#97A3B0',
+  /** 数据点圆心 */
+  symbolFill: '#FFFFFF',
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

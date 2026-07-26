@@ -18,6 +18,8 @@ import type {
   BenchmarkPoint,
   BenchmarkScatter,
   BoxStat,
+  DeclineCause,
+  DeltaTone,
   DeviationDirection,
   DeviationItem,
   ParallelDimension,
@@ -76,9 +78,17 @@ import type {
   RevenueAnalysis,
   TaxSourceAnalysis,
   TopicAnalysis,
+  KeyAlertType,
+  KeySourceDetail,
+  KeySourceFilters,
+  KeySourceQuery,
+  KeySourceRow,
+  KeySourceStatus,
   KeyValue,
   KpiCard,
+  MetricTrack,
   NamedValue,
+  TaxSourceTier,
   PagedResult,
   QaSession,
   RevenueTrend,
@@ -1005,6 +1015,211 @@ function benchmark(industryCode: string, metricKey: string): BenchIndustryData {
   const k = `${industryCode}|${metricKey}`
   if (!BENCH_CACHE[k]) BENCH_CACHE[k] = buildBenchmark(industryCode, metricKey)
   return BENCH_CACHE[k]
+}
+
+/* ==================== 税源监控:重点税源演示数据 ==================== */
+
+/** 责任管理员 */
+const KEY_MANAGERS = ['王××', '李××', '张××', '陈××', '赵××', '孙××']
+
+/** 预警类型元信息(口径说明属业务定义,随数据下发) */
+const KEY_ALERT_META: Array<{ type: KeyAlertType; label: string; desc: string; level: RiskLevel }> = [
+  { type: 'drop', label: '税款同比下降超阈值', desc: '本年累计入库同比下降 ≥ 20%', level: 'high' },
+  { type: 'zero', label: '连续零申报', desc: '连续 3 个月零申报或负申报', level: 'high' },
+  { type: 'stopInvoice', label: '突然停开票', desc: '近 2 个月开票量为 0,此前月均 ≥ 50 份', level: 'mid' },
+  { type: 'legalChange', label: '法人变更', desc: '近 6 个月发生法定代表人变更', level: 'mid' },
+  { type: 'addrChange', label: '地址变更', desc: '近 6 个月发生经营地址跨区变更', level: 'low' },
+]
+
+/** 近 12 期时间刻度 */
+const KEY_PERIODS = [
+  '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01',
+  '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07',
+]
+
+/**
+ * 重点税源名录(36 户)
+ * 取自评分样本集,与风险评分 / 团伙 / 异常申报各页是同一批主体;
+ * 分档按本年入库额划:A ≥ 3000 万、B ≥ 800 万、其余 C。
+ */
+const KEY_SOURCE_DATA: KeySourceRow[] = SCORE_DATA.slice(0, 36).map((s, i) => {
+  // 入库额按序位递减,使 A/B/C 三档都有足够样本
+  const yearTax = +(6800 * Math.pow(0.93, i) + 120 + ((i * 37) % 90)).toFixed(1)
+  const tier: TaxSourceTier = yearTax >= 3000 ? 'A' : yearTax >= 800 ? 'B' : 'C'
+  const yoyNum = +(((i * 23) % 61) - 34 + (i % 3) * 0.7).toFixed(1)
+
+  // 命中的预警:下降超阈值由 yoy 决定,其余按序位散布,保证每类都有户
+  const alerts: KeyAlertType[] = []
+  if (yoyNum <= -20) alerts.push('drop')
+  if (i % 9 === 4) alerts.push('zero')
+  if (i % 7 === 3) alerts.push('stopInvoice')
+  if (i % 11 === 6) alerts.push('legalChange')
+  if (i % 13 === 8) alerts.push('addrChange')
+
+  const status: KeySourceStatus =
+    alerts.indexOf('zero') >= 0 || alerts.indexOf('stopInvoice') >= 0
+      ? 'alert'
+      : yoyNum <= -20
+        ? 'declining'
+        : alerts.length
+          ? 'watch'
+          : 'normal'
+
+  // 迷你趋势:围绕月均值波动,下降户在后 4 期明显走低
+  const monthly = yearTax / 12
+  const spark = KEY_PERIODS.map((_, k) => {
+    const decline = yoyNum < 0 && k >= 8 ? 1 + (yoyNum / 100) * ((k - 7) / 4) * 2.2 : 1
+    return +Math.max(0, monthly * (0.82 + rand(i * 71 + k * 13) * 0.36) * decline).toFixed(1)
+  })
+
+  return {
+    taxId: s.taxId,
+    name: s.taxpayerName,
+    tier,
+    industry: s.industry,
+    district: s.district,
+    manager: KEY_MANAGERS[i % KEY_MANAGERS.length],
+    yearTax,
+    yoy: yoyNum >= 0 ? `+${yoyNum.toFixed(1)}%` : `${yoyNum.toFixed(1)}%`,
+    yoyTone: (yoyNum > 0 ? 'positive' : yoyNum < 0 ? 'negative' : 'neutral') as DeltaTone,
+    burdenRate: +(1.4 + rand(i * 17) * 3.6).toFixed(2),
+    status,
+    spark,
+    alerts,
+  }
+})
+
+/** 构造监控详情:四条指标共用同一时间轴,便于交叉印证 */
+function buildKeySourceDetail(row: KeySourceRow): KeySourceDetail {
+  const idx = KEY_SOURCE_DATA.indexOf(row)
+  const decline = row.yoyTone === 'negative'
+
+  /** 按基准值与走势因子生成一条指标轨道 */
+  const track = (key: string, name: string, unit: string, dec: number, base: number, dropRatio: number): MetricTrack => {
+    const values = KEY_PERIODS.map((_, k) => {
+      const f = decline && k >= 8 ? 1 - dropRatio * ((k - 7) / 4) : 1
+      return +Math.max(0, base * (0.88 + rand(idx * 53 + k * 7 + key.length) * 0.24) * f).toFixed(dec)
+    })
+    const yoyNum = +(((values[11] - values[0]) / (values[0] || 1)) * 100).toFixed(1)
+    return {
+      key,
+      name,
+      unit,
+      decimals: dec,
+      values,
+      yoy: yoyNum >= 0 ? `+${yoyNum.toFixed(1)}%` : `${yoyNum.toFixed(1)}%`,
+      yoyTone: (yoyNum > 0 ? 'positive' : yoyNum < 0 ? 'negative' : 'neutral') as DeltaTone,
+    }
+  }
+
+  // 关键设计:税额大跌但用电与社保基本平稳 → 指向政策性或申报口径,而非真实停产
+  const tracks: MetricTrack[] = [
+    { ...track('tax', '入库税额', '万元', 1, row.yearTax / 12, 0.42), values: row.spark },
+    track('invoice', '开票量', '份', 0, 320 + (idx % 7) * 45, 0.36),
+    track('social', '社保参保人数', '人', 0, 58 + (idx % 9) * 12, 0.06),
+    track('power', '用电量', '万千瓦时', 1, 26 + (idx % 5) * 8, 0.09),
+  ]
+  // 税额轨道的同比直接采用列表口径,避免同一数字两处不一致
+  tracks[0].yoy = row.yoy
+  tracks[0].yoyTone = row.yoyTone
+
+  const drop = Math.abs(parseFloat(row.yoy))
+  // 支撑数据的 stance:support 支持该原因 / against 排除该原因 / neutral 仅供参考
+  const causeList: DeclineCause[] = [
+    {
+      key: 'policy',
+      name: '政策性减免',
+      likelihood: decline ? 62 : 18,
+      conclusion: decline
+        ? '本期新增享受制造业留抵退税与研发费用加计扣除,合计减少入库约占降幅的六成'
+        : '未发现新增享受的减免政策',
+      evidences: [
+        { label: '本年新增减免备案', value: decline ? '2 项(留抵退税、加计扣除)' : '0 项', stance: decline ? 'support' : 'against' },
+        { label: '减免税额占降幅比', value: decline ? `${(drop * 0.6).toFixed(1)}pct / ${drop.toFixed(1)}pct` : '—', stance: decline ? 'support' : 'neutral' },
+        { label: '同行业同期减免面', value: '同行业 68% 的户同期享受该政策', stance: 'support' },
+      ],
+    },
+    {
+      key: 'business',
+      name: '经营下滑',
+      likelihood: decline ? 34 : 12,
+      conclusion: '用电量与社保人数基本平稳,不支持实际停产或大幅收缩的判断',
+      evidences: [
+        { label: '用电量同比', value: `${tracks[3].yoy}`, stance: 'against' },
+        { label: '社保参保人数', value: `${tracks[2].values[11]} 人,较年初${tracks[2].yoyTone === 'negative' ? '减少' : '持平'}`, stance: 'against' },
+        { label: '开票量同比', value: `${tracks[1].yoy}`, stance: tracks[1].yoyTone === 'negative' ? 'support' : 'against' },
+      ],
+    },
+    {
+      key: 'migrate',
+      name: '迁移外流',
+      likelihood: row.alerts.indexOf('addrChange') >= 0 ? 46 : 8,
+      conclusion:
+        row.alerts.indexOf('addrChange') >= 0
+          ? '近 6 个月发生经营地址跨区变更,需核实是否存在实际经营迁出'
+          : '登记信息未发生跨区变更,无迁移迹象',
+      evidences: [
+        { label: '登记地址变更', value: row.alerts.indexOf('addrChange') >= 0 ? '近 6 个月内变更 1 次' : '无变更', stance: row.alerts.indexOf('addrChange') >= 0 ? 'support' : 'against' },
+        { label: '关联企业外地新设', value: row.alerts.indexOf('addrChange') >= 0 ? '法人名下外省新设 1 户' : '无', stance: row.alerts.indexOf('addrChange') >= 0 ? 'support' : 'against' },
+      ],
+    },
+    {
+      key: 'season',
+      name: '季节性波动',
+      likelihood: 26,
+      conclusion: '该行业一季度为传统淡季,历史同期亦有回落,但幅度小于本期',
+      evidences: [
+        { label: '往年同期波幅', value: '近三年一季度平均回落 8.6%', stance: 'neutral' },
+        { label: '本期回落幅度', value: `${drop.toFixed(1)}%,显著大于历史波幅`, stance: 'against' },
+      ],
+    },
+    {
+      key: 'risk',
+      name: '风险行为',
+      likelihood: row.status === 'alert' ? 41 : 14,
+      conclusion:
+        row.status === 'alert'
+          ? '存在停开票 / 零申报等异常信号,不能排除隐匿收入的可能,建议核查'
+          : '暂未发现隐匿收入、虚增进项等异常信号',
+      evidences: [
+        { label: '开票中断', value: row.alerts.indexOf('stopInvoice') >= 0 ? '近 2 个月开票量为 0' : '开票连续', stance: row.alerts.indexOf('stopInvoice') >= 0 ? 'support' : 'against' },
+        { label: '零申报', value: row.alerts.indexOf('zero') >= 0 ? '连续 3 个月零申报' : '无零申报', stance: row.alerts.indexOf('zero') >= 0 ? 'support' : 'against' },
+        { label: '银行流水/申报收入比', value: row.status === 'alert' ? '1.38 倍(同业中位 1.03)' : '1.05 倍(同业中位 1.03)', stance: row.status === 'alert' ? 'support' : 'against' },
+      ],
+    },
+  ]
+  // 按可能性降序;单独一步排序,以免数组字面量脱离上下文类型推断
+  const causes: DeclineCause[] = causeList.slice().sort((a, b) => b.likelihood - a.likelihood)
+
+  return {
+    taxId: row.taxId,
+    name: row.name,
+    tier: row.tier,
+    status: row.status,
+    profile: [
+      { key: '所属行业', value: row.industry, numeric: false },
+      { key: '所属区县', value: row.district, numeric: false },
+      { key: '责任管理员', value: row.manager, numeric: false },
+      { key: '纳税人识别号', value: row.taxId, numeric: true },
+      { key: '本年累计入库', value: `${money(row.yearTax)} 万元`, numeric: true },
+      { key: '同比', value: row.yoy, numeric: true },
+      { key: '税负率', value: `${row.burdenRate.toFixed(2)}%`, numeric: true },
+      { key: '跟踪要求', value: row.tier === 'A' ? '逐户建档 · 按月跟踪' : row.tier === 'B' ? '按季跟踪' : '按年跟踪', numeric: false },
+    ],
+    alerts: KEY_ALERT_META.filter((m) => row.alerts.indexOf(m.type) >= 0).map((m) => ({
+      type: m.type,
+      label: m.label,
+      desc: m.desc,
+      count: 1,
+      level: m.level,
+    })),
+    periods: KEY_PERIODS,
+    tracks,
+    declineSummary: decline
+      ? `本年入库同比 ${row.yoy},降幅主要出现在近 4 期。税额与开票量同步回落,但社保参保人数与用电量基本平稳,交叉印证不支持"实际停产"的判断,优先核实减免政策适用与申报口径。`
+      : `本年入库同比 ${row.yoy},各项指标同步平稳,未出现需要归因的异常回落。`,
+    causes,
+  }
 }
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
@@ -2323,6 +2538,69 @@ export const mockClient: ApiClient = {
       }
       const fallback = abnormalIndustry(INDUSTRY_CODES[2])
       return delay(fallback.details[fallback.rows[0].taxId])
+    },
+  },
+
+  /* ==================== 税源监控 · 重点税源监控 ==================== */
+  taxsource: {
+    getKeySourceFilters(): Promise<KeySourceFilters> {
+      const tierCount = (t: TaxSourceTier) => KEY_SOURCE_DATA.filter((r) => r.tier === t).length
+      const alertCount = (t: KeyAlertType) => KEY_SOURCE_DATA.filter((r) => r.alerts.indexOf(t) >= 0).length
+      const totalTax = KEY_SOURCE_DATA.reduce((s, r) => s + r.yearTax, 0)
+      const alertHouses = KEY_SOURCE_DATA.filter((r) => r.alerts.length > 0).length
+      return delay({
+        updatedAt: '2026-07-24 06:20',
+        tiers: [
+          { value: 'A' as TaxSourceTier, label: 'A 类', desc: '逐户建档 · 按月跟踪', count: tierCount('A') },
+          { value: 'B' as TaxSourceTier, label: 'B 类', desc: '按季跟踪', count: tierCount('B') },
+          { value: 'C' as TaxSourceTier, label: 'C 类', desc: '按年跟踪', count: tierCount('C') },
+        ],
+        districts: [{ value: 'all', label: '全部区县' }].concat(
+          Object.keys(DISTRICT_CN).map((code) => ({ value: code, label: DISTRICT_CN[code] })),
+        ),
+        alertGroups: KEY_ALERT_META.map((m) => ({
+          type: m.type,
+          label: m.label,
+          desc: m.desc,
+          count: alertCount(m.type),
+          level: m.level,
+        })),
+        kpis: [
+          { label: '重点税源户数', value: String(KEY_SOURCE_DATA.length), unit: '户', accent: 'primary' },
+          { label: '本年累计入库', value: (totalTax / 10000).toFixed(2), unit: '亿元', accent: 'teal' },
+          { label: '入库同比下降户', value: String(KEY_SOURCE_DATA.filter((r) => r.yoyTone === 'negative').length), unit: '户', accent: 'gold' },
+          { label: '当前预警户', value: String(alertHouses), unit: '户', accent: 'red' },
+        ],
+      })
+    },
+
+    getKeySources(query: KeySourceQuery): Promise<PagedResult<KeySourceRow>> {
+      const kw = query.keyword.trim()
+      const filtered = KEY_SOURCE_DATA.filter((r) => {
+        if (r.tier !== query.tier) return false
+        if (kw && r.name.indexOf(kw) < 0 && r.taxId.toUpperCase().indexOf(kw.toUpperCase()) < 0) return false
+        if (query.districtCode !== 'all' && DISTRICT_CODE_BY_CN[r.district] !== query.districtCode) return false
+        if (query.alertType !== 'all' && r.alerts.indexOf(query.alertType as KeyAlertType) < 0) return false
+        return true
+      })
+      const dir = query.sortDir
+      const sorted = filtered.slice().sort((a, b) => {
+        if (query.sortKey === 'yoy') return (parseFloat(a.yoy) - parseFloat(b.yoy)) * dir
+        if (query.sortKey === 'burdenRate') return (a.burdenRate - b.burdenRate) * dir
+        return (a.yearTax - b.yearTax) * dir
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: sorted.slice(start, start + query.pageSize),
+        total: sorted.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
+    },
+
+    getKeySourceDetail(taxId: string): Promise<KeySourceDetail> {
+      const row = KEY_SOURCE_DATA.filter((r) => r.taxId === taxId)[0] || KEY_SOURCE_DATA[0]
+      return delay(buildKeySourceDetail(row))
     },
   },
 

@@ -2602,6 +2602,190 @@ export interface ModelApi {
 }
 
 /* ========================================================================
+ * 十二、税源监控（TaxSource）· 重点税源监控
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》6.1 重点税源监控。
+ * 这是「盯人」的清单页:对象是有责任管理员的固定户,不是模型算出来的名单;
+ * 因此列表是分档(A/B/C)常驻名录,预警是名录之上的触发提示,
+ * 详情要解决的问题是「税额降了到底为什么」——多指标交叉印证 + 下降归因。
+ * ====================================================================== */
+
+/** 税源分档:A 类逐户建档按月跟踪 / B 类季度跟踪 / C 类年度跟踪 */
+export type TaxSourceTier = 'A' | 'B' | 'C'
+
+/** 重点税源监控状态 */
+export type KeySourceStatus = 'normal' | 'watch' | 'declining' | 'alert'
+
+/** 预警触发类型 */
+export type KeyAlertType = 'drop' | 'zero' | 'stopInvoice' | 'legalChange' | 'addrChange'
+
+/** 预警分组(按触发类型汇总) */
+export interface KeyAlertGroup {
+  /** 触发类型 */
+  type: KeyAlertType
+  /** 类型名称 */
+  label: string
+  /** 触发口径说明 */
+  desc: string
+  /** 触发户数 */
+  count: number
+  /** 紧要程度 */
+  level: RiskLevel
+}
+
+/** 重点税源列表行 */
+export interface KeySourceRow {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  name: string
+  /** 税源分档 */
+  tier: TaxSourceTier
+  /** 所属行业 */
+  industry: string
+  /** 所属区县 */
+  district: string
+  /** 责任管理员 */
+  manager: string
+  /** 本年累计入库(万元) */
+  yearTax: number
+  /** 同比(带符号,如 "-18.4%") */
+  yoy: string
+  /** 同比语义(下降为 negative) */
+  yoyTone: DeltaTone
+  /** 税负率(百分数) */
+  burdenRate: number
+  /** 监控状态 */
+  status: KeySourceStatus
+  /** 近 12 期税额(万元),用于单元格内迷你趋势线 */
+  spark: number[]
+  /** 当前命中的预警类型 */
+  alerts: KeyAlertType[]
+}
+
+/** 重点税源·查询参数 */
+export interface KeySourceQuery {
+  /** 纳税人名称 / 识别号关键字 */
+  keyword: string
+  /** 税源分档 */
+  tier: TaxSourceTier
+  /** 区县编码;'all' 不限 */
+  districtCode: string
+  /** 预警类型过滤;'all' 不限 */
+  alertType: string
+  /** 排序字段(yearTax / yoy / burdenRate) */
+  sortKey: string
+  /** 排序方向:1 升序 / -1 降序 */
+  sortDir: 1 | -1
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 重点税源·分档选项 */
+export interface TierOption {
+  /** 分档值 */
+  value: TaxSourceTier
+  /** 分档名称 */
+  label: string
+  /** 跟踪要求说明 */
+  desc: string
+  /** 户数 */
+  count: number
+}
+
+/** 重点税源·筛选项与概览 */
+export interface KeySourceFilters {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 分档选项(标签页) */
+  tiers: TierOption[]
+  /** 区县选项(含「全部区县」) */
+  districts: FilterOption[]
+  /** 当前预警分组 */
+  alertGroups: KeyAlertGroup[]
+  /** 概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 监控详情·单条指标轨道(与 periods 逐点对齐) */
+export interface MetricTrack {
+  /** 指标键 */
+  key: string
+  /** 指标名称 */
+  name: string
+  /** 单位 */
+  unit: string
+  /** 展示小数位 */
+  decimals: number
+  /** 各期取值 */
+  values: number[]
+  /** 本期同比(带符号) */
+  yoy: string
+  /** 同比语义 */
+  yoyTone: DeltaTone
+}
+
+/** 下降归因·一条支撑数据 */
+export interface CauseEvidence {
+  /** 数据项名称 */
+  label: string
+  /** 数据表现 */
+  value: string
+  /** 该项对本原因是支持还是排除 */
+  stance: 'support' | 'against' | 'neutral'
+}
+
+/** 下降归因·候选原因 */
+export interface DeclineCause {
+  /** 原因键 */
+  key: string
+  /** 原因名称(政策性减免 / 经营下滑 / 迁移外流 / 季节性 / 风险行为) */
+  name: string
+  /** 可能性(百分数) */
+  likelihood: number
+  /** 判断结论 */
+  conclusion: string
+  /** 支撑与排除数据 */
+  evidences: CauseEvidence[]
+}
+
+/** 重点税源·监控详情 */
+export interface KeySourceDetail {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称 */
+  name: string
+  /** 税源分档 */
+  tier: TaxSourceTier
+  /** 监控状态 */
+  status: KeySourceStatus
+  /** 档案摘要(行业 / 管理员 / 登记信息等) */
+  profile: KeyValue[]
+  /** 当前命中的预警 */
+  alerts: KeyAlertGroup[]
+  /** 时间轴刻度(近 12 期) */
+  periods: string[]
+  /** 多指标轨道(共用同一时间轴,便于交叉印证) */
+  tracks: MetricTrack[]
+  /** 归因结论 */
+  declineSummary: string
+  /** 候选原因(按可能性降序) */
+  causes: DeclineCause[]
+}
+
+/** 税源监控接口分组 */
+export interface TaxSourceApi {
+  /** 重点税源·筛选项、分档与预警分组 */
+  getKeySourceFilters(): Promise<KeySourceFilters>
+  /** 重点税源·名录列表(服务端排序 + 分页) */
+  getKeySources(query: KeySourceQuery): Promise<PagedResult<KeySourceRow>>
+  /** 重点税源·监控详情(多指标时间轴 + 下降归因) */
+  getKeySourceDetail(taxId: string): Promise<KeySourceDetail>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -2619,6 +2803,8 @@ export interface ApiClient {
   graph: GraphApi
   /** 智能模型 · 风险评分模型 */
   model: ModelApi
+  /** 税源监控 · 重点税源监控 */
+  taxsource: TaxSourceApi
   /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
   decision: DecisionApi
   /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */
