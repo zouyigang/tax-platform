@@ -119,6 +119,10 @@ import type {
   NewEntQuadrant,
   NewEntQuery,
   NewEntRow,
+  NlAnswer,
+  NlColumn,
+  NlMetricDictItem,
+  NlSession,
   PotentialDimension,
   ShellFeature,
   TaxSourceTier,
@@ -135,6 +139,7 @@ import type {
   RuleRow,
   RuleStatus,
   ScoreAttribution,
+  SeriesPoint,
   ScoreFilters,
   ScoreModelState,
   ScoreQuery,
@@ -2062,6 +2067,203 @@ function buildDocGen(query: DocGenQuery): DocGenResult {
   }
 }
 
+/* ==================== 智能应用:自然语言取数演示数据 ==================== */
+
+/** 指标字典(侧栏可浏览,点击插入提问框) */
+const NL_DICT: NlMetricDictItem[] = [
+  { key: 'tax_amount', name: '入库税额', caliber: '税款所属期内实际入库的各税种合计,不含出口退税与免抵调库', source: 'dw.f_tax_revenue(只读视图)', unit: '万元', category: '收入' },
+  { key: 'tax_yoy', name: '入库同比', caliber: '本期入库税额与上年同期之比减 1,同口径比较', source: 'dw.f_tax_revenue', unit: '%', category: '收入' },
+  { key: 'budget_rate', name: '预算完成率', caliber: '本年累计入库 ÷ 年度预算任务数', source: 'dw.f_budget_progress', unit: '%', category: '收入' },
+  { key: 'burden_rate', name: '增值税税负率', caliber: '应纳增值税额 ÷ 不含税销售额;剔除留抵退税影响', source: 'dw.f_declare_vat', unit: '%', category: '税负' },
+  { key: 'eit_rate', name: '所得税贡献率', caliber: '应纳企业所得税额 ÷ 营业收入', source: 'dw.f_declare_eit', unit: '%', category: '税负' },
+  { key: 'invoice_amount', name: '开票金额', caliber: '增值税发票开具的不含税金额合计,含红字冲减', source: 'dw.f_invoice_detail', unit: '万元', category: '发票' },
+  { key: 'invoice_count', name: '开票份数', caliber: '开具的发票份数,含专票与普票', source: 'dw.f_invoice_detail', unit: '份', category: '发票' },
+  { key: 'clue_count', name: '风险线索数', caliber: '规则引擎与模型推送并已入池的线索条数', source: 'dw.f_risk_clue', unit: '条', category: '风险' },
+  { key: 'clue_hit_rate', name: '线索查实率', caliber: '核查结论为「存在问题」的线索数 ÷ 已办结线索数', source: 'dw.f_risk_result', unit: '%', category: '风险' },
+  { key: 'recover_tax', name: '查补入库税款', caliber: '风险应对与稽查查补并实际入库的税款', source: 'dw.f_risk_result', unit: '万元', category: '风险' },
+  { key: 'taxpayer_count', name: '纳税人户数', caliber: '统计期末处于正常状态的登记户数', source: 'dw.d_taxpayer', unit: '户', category: '主体' },
+  { key: 'new_taxpayer', name: '新办户数', caliber: '统计期内新办理税务登记的户数', source: 'dw.d_taxpayer', unit: '户', category: '主体' },
+]
+
+/** 示例问题 */
+const NL_SAMPLES = [
+  '各区县今年以来的入库税额排名',
+  '增值税近 12 个月的入库趋势',
+  '本年累计入库税额是多少',
+  '分税种的收入结构占比',
+  '风险线索数最多的前 5 个行业',
+]
+
+/** 从问题里识别命中的指标(按字典名做包含匹配) */
+function nlMatchMetrics(q: string): NlMetricDictItem[] {
+  const hit = NL_DICT.filter((d) => q.indexOf(d.name) >= 0)
+  if (hit.length) return hit
+  // 未直接命中指标名时按常见说法回退
+  if (/(税额|入库|收入|税收)/.test(q)) return [NL_DICT[0]]
+  if (/(税负)/.test(q)) return [NL_DICT[3]]
+  if (/(发票|开票)/.test(q)) return [NL_DICT[5]]
+  if (/(线索|风险)/.test(q)) return [NL_DICT[7]]
+  if (/(户数|新办|纳税人)/.test(q)) return [NL_DICT[10]]
+  return [NL_DICT[0]]
+}
+
+/** 识别维度 */
+function nlMatchDims(q: string): string[] {
+  const dims: string[] = []
+  if (/(区县|各区|分区)/.test(q)) dims.push('行政区划')
+  if (/(税种|分税种)/.test(q)) dims.push('税种')
+  if (/(行业)/.test(q)) dims.push('行业门类')
+  if (/(月|逐月|趋势|走势)/.test(q)) dims.push('时间(月)')
+  if (/(纳税人|企业|户)/.test(q) && !/户数/.test(q)) dims.push('纳税人')
+  return dims
+}
+
+/** 识别时间范围 */
+function nlMatchTime(q: string): string {
+  if (/近\s*12\s*个月/.test(q)) return '2025-08 至 2026-07(近 12 个月)'
+  if (/(今年以来|本年|年初至今)/.test(q)) return '2026-01-01 至 2026-07-24(本年累计)'
+  if (/(上月|上个月)/.test(q)) return '2026-06(上月)'
+  if (/(本月|当月)/.test(q)) return '2026-07(本月)'
+  if (/(去年|上年)/.test(q)) return '2025-01-01 至 2025-12-31(上年度)'
+  return '2026-01-01 至 2026-07-24(默认本年累计)'
+}
+
+/** 识别未能解析的词:演示几个语义层里确实没有的说法 */
+function nlUnresolved(q: string): string[] {
+  const unknown = ['毛利率', '利润总额', '净资产', '员工人数', '客单价']
+  return unknown.filter((u) => q.indexOf(u) >= 0)
+}
+
+/** 生成一次取数结果 */
+function buildNlAnswer(question: string): NlAnswer {
+  const q = question.trim()
+  const metrics = nlMatchMetrics(q)
+  const dims = nlMatchDims(q)
+  const timeRange = nlMatchTime(q)
+  const unresolved = nlUnresolved(q)
+  const m = metrics[0]
+
+  const base: Omit<NlAnswer, 'kind' | 'summary' | 'columns' | 'rows' | 'bars' | 'points' | 'metric' | 'sql' | 'rowCount'> = {
+    semantic: { metrics: metrics.map((x) => x.name), dimensions: dims, timeRange, filters: ['纳税人状态 = 正常'], unresolved },
+    unit: m.unit,
+    elapsedMs: 180 + Math.round(rand(q.length) * 620),
+  }
+
+  /* ① 趋势类 → 折线 */
+  if (/(趋势|走势|逐月|每月|变化)/.test(q)) {
+    const points: SeriesPoint[] = KEY_PERIODS.map((p, i) => ({
+      label: p.slice(5),
+      value: +(38000 + i * 900 + rand(i * 17) * 6000).toFixed(0),
+    }))
+    return {
+      ...base,
+      kind: 'line',
+      summary: `${m.name}近 12 个月整体上行,7 月为区间高点。`,
+      columns: [],
+      rows: [],
+      bars: [],
+      points,
+      metric: null,
+      rowCount: points.length,
+      sql: `SELECT date_trunc('month', t.tax_period) AS month,\n       SUM(t.tax_amount) / 10000 AS ${m.key}\nFROM dw.f_tax_revenue t\nWHERE t.tax_period >= '2025-08-01'\n  AND t.tax_period <  '2026-08-01'\n  AND t.taxpayer_status = 'NORMAL'\n  AND t.district_code IN (SELECT district_code FROM sec.v_user_district_scope)\nGROUP BY 1\nORDER BY 1;`,
+    }
+  }
+
+  /* ② 占比 / 结构类 → 柱状 */
+  if (/(占比|结构|构成|分税种)/.test(q)) {
+    const bars: NamedValue[] = FC_TAX.map((t) => ({ name: t.name, value: t.base }))
+    return {
+      ...base,
+      kind: 'bar',
+      summary: `增值税占比最高,为 ${((FC_TAX[0].base / FC_TAX.reduce((s, t) => s + t.base, 0)) * 100).toFixed(1)}%。`,
+      columns: [],
+      rows: [],
+      bars,
+      points: [],
+      metric: null,
+      rowCount: bars.length,
+      sql: `SELECT d.tax_type_name,\n       SUM(t.tax_amount) / 10000 AS tax_amount\nFROM dw.f_tax_revenue t\nJOIN dw.d_tax_type d ON d.tax_type_code = t.tax_type_code\nWHERE t.tax_period >= '2026-01-01'\n  AND t.taxpayer_status = 'NORMAL'\n  AND t.district_code IN (SELECT district_code FROM sec.v_user_district_scope)\nGROUP BY 1\nORDER BY 2 DESC;`,
+    }
+  }
+
+  /* ③ 单值类 → 指标卡 */
+  if (/(是多少|多少钱|合计是|总共|总额)/.test(q)) {
+    const total = FC_TAX.reduce((s, t) => s + t.base, 0) * 7
+    return {
+      ...base,
+      kind: 'metric',
+      summary: `${timeRange} 内${m.name}合计。`,
+      columns: [],
+      rows: [],
+      bars: [],
+      points: [],
+      metric: {
+        label: `${m.name}(本年累计)`,
+        value: (total / 10000).toFixed(2),
+        unit: '亿元',
+        note: `同比 +6.4%,预算完成 58.2%;口径:${m.caliber}`,
+      },
+      rowCount: 1,
+      sql: `SELECT SUM(t.tax_amount) / 100000000 AS ${m.key}_yi\nFROM dw.f_tax_revenue t\nWHERE t.tax_period >= '2026-01-01'\n  AND t.tax_period <= '2026-07-24'\n  AND t.taxpayer_status = 'NORMAL'\n  AND t.district_code IN (SELECT district_code FROM sec.v_user_district_scope);`,
+    }
+  }
+
+  /* ④ 其余(排名 / 明细 / 哪些)→ 表格 */
+  const byIndustry = /行业/.test(q)
+  const columns: NlColumn[] = byIndustry
+    ? [
+        { key: 'rank', label: '序号', numeric: true },
+        { key: 'industry', label: '行业门类', numeric: false },
+        { key: 'clue', label: '风险线索数(条)', numeric: true },
+        { key: 'rate', label: '查实率(%)', numeric: true },
+      ]
+    : [
+        { key: 'rank', label: '序号', numeric: true },
+        { key: 'district', label: '区县', numeric: false },
+        { key: 'amount', label: `${m.name}(万元)`, numeric: true },
+        { key: 'yoy', label: '同比(%)', numeric: true },
+        { key: 'share', label: '占比(%)', numeric: true },
+      ]
+
+  const rows: Array<Record<string, string | number>> = byIndustry
+    ? INDUSTRY_CODES.slice(0, 5).map((c, i) => ({
+        rank: i + 1,
+        industry: INDUSTRY_CN[c],
+        clue: 46 - i * 7 + Math.round(rand(i * 13) * 6),
+        rate: +(58 - i * 4.2 + rand(i * 7) * 5).toFixed(1),
+      }))
+    : (() => {
+        const total = FC_DISTRICT.reduce((s, d) => s + d.share, 0)
+        return FC_DISTRICT.map((d, i) => {
+          const amount = +(FC_TAX.reduce((s, t) => s + t.base, 0) * 7 * d.share).toFixed(1)
+          return {
+            rank: i + 1,
+            district: DISTRICT_CN[d.code],
+            amount,
+            yoy: +((rand(i * 31) - 0.3) * 22).toFixed(1),
+            share: +((d.share / total) * 100).toFixed(1),
+          }
+        })
+      })()
+
+  return {
+    ...base,
+    kind: 'table',
+    summary: byIndustry
+      ? `线索数最多的是${INDUSTRY_CN[INDUSTRY_CODES[0]]},共 ${rows[0].clue} 条。`
+      : `${rows[0].district}入库最多,为 ${money(rows[0].amount as number)} 万元。`,
+    columns,
+    rows,
+    bars: [],
+    points: [],
+    metric: null,
+    rowCount: rows.length,
+    sql: byIndustry
+      ? `SELECT ROW_NUMBER() OVER (ORDER BY COUNT(1) DESC) AS rank,\n       i.industry_name,\n       COUNT(1) AS clue_count,\n       ROUND(100.0 * SUM(CASE WHEN r.conclusion = 'PROBLEM' THEN 1 ELSE 0 END)\n             / NULLIF(COUNT(r.clue_id), 0), 1) AS hit_rate\nFROM dw.f_risk_clue c\nJOIN dw.d_industry i ON i.industry_code = c.industry_code\nLEFT JOIN dw.f_risk_result r ON r.clue_id = c.clue_id\nWHERE c.create_date >= '2026-01-01'\n  AND c.district_code IN (SELECT district_code FROM sec.v_user_district_scope)\nGROUP BY i.industry_name\nORDER BY clue_count DESC\nLIMIT 5;`
+      : `SELECT ROW_NUMBER() OVER (ORDER BY SUM(t.tax_amount) DESC) AS rank,\n       d.district_name,\n       SUM(t.tax_amount) / 10000 AS ${m.key},\n       ROUND(100.0 * (SUM(t.tax_amount) / NULLIF(SUM(t.tax_amount_ly), 0) - 1), 1) AS yoy,\n       ROUND(100.0 * SUM(t.tax_amount) / SUM(SUM(t.tax_amount)) OVER (), 1) AS share\nFROM dw.f_tax_revenue t\nJOIN dw.d_district d ON d.district_code = t.district_code\nWHERE t.tax_period >= '2026-01-01'\n  AND t.taxpayer_status = 'NORMAL'\n  AND t.district_code IN (SELECT district_code FROM sec.v_user_district_scope)\nGROUP BY d.district_name\nORDER BY 3 DESC;`,
+  }
+}
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -3692,6 +3894,25 @@ export const mockClient: ApiClient = {
     generateDoc(query: DocGenQuery): Promise<DocGenResult> {
       // 生成过程比普通取数慢,延时给足以呈现"正在生成"
       return delay(buildDocGen(query), 900)
+    },
+
+    getNlSession(): Promise<NlSession> {
+      const q0 = NL_SAMPLES[0]
+      return delay({
+        greeting: '用一句话描述你要看的数,系统会解析成指标与维度后查询只读数据视图,并把结果直接画成图表。',
+        scopeNote: '查询基于只读分析视图执行,不落库、不可写;结果已按当前用户的数据权限范围过滤,仅返回授权辖区内的数据。',
+        samples: NL_SAMPLES,
+        dict: NL_DICT,
+        history: [
+          { role: 'user', text: q0, answer: null, time: '09:12' },
+          { role: 'system', text: '', answer: buildNlAnswer(q0), time: '09:12' },
+        ],
+      })
+    },
+
+    askNlQuery(question: string): Promise<NlAnswer> {
+      // 取数比普通接口慢一点,便于呈现"正在解析并查询"
+      return delay(buildNlAnswer(question), 760)
     },
   },
 

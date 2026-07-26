@@ -80,6 +80,8 @@ import type {
   NewEntPoint,
   NewEntQuery,
   NewEntRow,
+  NlAnswer,
+  NlSession,
   PagedResult,
   QaSession,
   ForecastBoard,
@@ -264,6 +266,12 @@ export const httpClient: ApiClient = {
     },
     getDocGenTasks(taxId: string): Promise<DocGenTask[]> {
       return get<DocGenTask[]>('/app/doc-gen/tasks', { taxId })
+    },
+    getNlSession(): Promise<NlSession> {
+      return get<NlSession>('/app/nl-query/session')
+    },
+    askNlQuery(question: string): Promise<NlAnswer> {
+      return get<NlAnswer>('/app/nl-query/ask', { question })
     },
     generateDoc(query: DocGenQuery): Promise<DocGenResult> {
       return get<DocGenResult>('/app/doc-gen/generate', {

@@ -3337,6 +3337,112 @@ export interface DocGenResult {
   blocks: DocGenBlock[]
 }
 
+/* ------------------------------------------------------------------------
+ * 智能应用 · 自然语言取数(《需求文档》5.5)
+ * 三页里只有这一页是对话形态,但与「政策智能问答」的差别是本质的:
+ *   问答返回的是**文字与法条依据**,取数返回的是**图表与表格**;
+ *   问答的侧栏是引用来源,取数的侧栏是**指标字典**(可浏览、可插入提问);
+ *   取数还必须回答两个问答页没有的问题 —— 「你把我的话理解成了什么」(语义层映射)
+ *   和「你到底查了什么」(生成的 SQL),否则数出得再快也不敢用。
+ * ---------------------------------------------------------------------- */
+
+/** 取数结果的呈现形态 */
+export type NlResultKind = 'table' | 'bar' | 'line' | 'metric'
+
+/** 语义层映射:把自然语言解析成了哪些指标 / 维度 / 时间范围 */
+export interface NlSemantic {
+  /** 命中的指标 */
+  metrics: string[]
+  /** 命中的维度 */
+  dimensions: string[]
+  /** 解析出的时间范围 */
+  timeRange: string
+  /** 附加过滤条件 */
+  filters: string[]
+  /** 未能识别的词(如实列出,不要假装全都懂了) */
+  unresolved: string[]
+}
+
+/** 表格结果的列定义 */
+export interface NlColumn {
+  /** 字段键 */
+  key: string
+  /** 列名 */
+  label: string
+  /** 是否数值列(右对齐 + 等宽数字) */
+  numeric: boolean
+}
+
+/** 取数结果 */
+export interface NlAnswer {
+  /** 呈现形态 */
+  kind: NlResultKind
+  /** 语义层映射 */
+  semantic: NlSemantic
+  /** 一句话结论(结果的载体是图表,不是这句话) */
+  summary: string
+  /** 表格列(kind='table') */
+  columns: NlColumn[]
+  /** 表格行(kind='table') */
+  rows: Array<Record<string, string | number>>
+  /** 柱图数据(kind='bar') */
+  bars: NamedValue[]
+  /** 折线数据(kind='line') */
+  points: SeriesPoint[]
+  /** 单指标(kind='metric') */
+  metric: { label: string; value: string; unit: string; note: string } | null
+  /** 数值单位 */
+  unit: string
+  /** 实际执行的查询语句 */
+  sql: string
+  /** 返回行数 */
+  rowCount: number
+  /** 执行耗时(毫秒) */
+  elapsedMs: number
+}
+
+/** 对话消息 */
+export interface NlMessage {
+  /** 角色 */
+  role: 'user' | 'system'
+  /** 用户提问文本 / 系统的一句话 */
+  text: string
+  /** 系统回答的取数结果 */
+  answer: NlAnswer | null
+  /** 时间 */
+  time: string
+}
+
+/** 指标字典项(侧栏可浏览,点击插入提问框) */
+export interface NlMetricDictItem {
+  /** 指标键 */
+  key: string
+  /** 指标名 */
+  name: string
+  /** 口径说明 */
+  caliber: string
+  /** 数据来源 */
+  source: string
+  /** 单位 */
+  unit: string
+  /** 所属分类 */
+  category: string
+}
+
+/** 取数会话 */
+export interface NlSession {
+  /** 开场说明 */
+  greeting: string
+  /** 数据权限与只读视图提示(底部常驻) */
+  scopeNote: string
+  /** 预置示例问题 */
+  samples: string[]
+  /** 指标字典 */
+  dict: NlMetricDictItem[]
+  /** 预置的一轮示例对话 */
+  history: NlMessage[]
+}
+
 /** 智能应用接口分组 */
 export interface AppApi {
   /** 资料处理·队列筛选项 */
@@ -3353,6 +3459,10 @@ export interface AppApi {
   getDocGenTasks(taxId: string): Promise<DocGenTask[]>
   /** 文书生成·生成正文 */
   generateDoc(query: DocGenQuery): Promise<DocGenResult>
+  /** 自然语言取数·会话初始化(示例问题 / 指标字典 / 预置对话) */
+  getNlSession(): Promise<NlSession>
+  /** 自然语言取数·提交一次提问 */
+  askNlQuery(question: string): Promise<NlAnswer>
 }
 
 /* ========================================================================

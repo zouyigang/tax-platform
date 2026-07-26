@@ -248,12 +248,7 @@ export const MENU: MenuEntry[] = [
         key: 'app-nl-query',
         title: '自然语言取数',
         path: '/app/nl-query',
-        status: 'placeholder',
-        desc: [
-          '用自然语言描述即可查询平台数据并生成图表。',
-          '降低数据分析门槛,支持追问与结果导出。',
-          '对应需求 5.5 自然语言取数。',
-        ],
+        status: 'done',
       },
     ],
   },
