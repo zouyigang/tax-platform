@@ -35,7 +35,8 @@ const { tip, showTip, hideTip } = useTooltip()
 
 const W = 1000
 const H = 400
-const PAD = { t: 18, r: 24, b: 40, l: 58 }
+// 顶部留白要容得下纵轴名(画在绘图区上方,避免与 100 刻度挤在一起)
+const PAD = { t: 36, r: 24, b: 40, l: 58 }
 
 function x(v: number): number {
   return PAD.l + (v / 100) * (W - PAD.l - PAD.r)
@@ -147,7 +148,7 @@ function onEnter(e: MouseEvent, p: NewEntPoint) {
       <text :x="(PAD.l + W - PAD.r) / 2" :y="H - 6" text-anchor="middle" :fill="QUADRANT.axisText" font-size="11">
         空壳风险分 →
       </text>
-      <text :x="16" :y="PAD.t + 8" :fill="QUADRANT.axisText" font-size="11">↑ 税源潜力分</text>
+      <text :x="14" :y="16" :fill="QUADRANT.axisText" font-size="11">↑ 税源潜力分</text>
     </svg>
 
     <ChartTooltip :tip="tip" />
