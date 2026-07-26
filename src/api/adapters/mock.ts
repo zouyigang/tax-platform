@@ -13,6 +13,11 @@ import type {
   AbnormalRow,
   ApiClient,
   ArchiveDeclare,
+  BenchmarkAttribution,
+  BenchmarkBoard,
+  BenchmarkPoint,
+  BenchmarkScatter,
+  BoxStat,
   DeviationDirection,
   DeviationItem,
   ParallelDimension,
@@ -73,6 +78,7 @@ import type {
   TopicAnalysis,
   KeyValue,
   KpiCard,
+  NamedValue,
   PagedResult,
   QaSession,
   RevenueTrend,
@@ -886,6 +892,119 @@ function abnormalIndustry(industryCode: string): AbnIndustryData {
   const code = INDUSTRY_CODES.indexOf(industryCode) >= 0 ? industryCode : INDUSTRY_CODES[2]
   if (!ABN_CACHE[code]) ABN_CACHE[code] = buildAbnormalIndustry(code)
   return ABN_CACHE[code]
+}
+
+/* ==================== 智能模型:行业税负基准演示数据 ==================== */
+
+/** 12 个行业中类(可上卷到评分/异常检测所用的 6 个门类) */
+const BENCH_INDUSTRIES: Array<{ code: string; name: string; category: string; factor: number }> = [
+  { code: 'wh-med', name: '医药批发', category: '批发零售', factor: 0.72 },
+  { code: 'wh-mat', name: '建材批发', category: '批发零售', factor: 0.86 },
+  { code: 'wh-car', name: '汽车零售', category: '批发零售', factor: 0.65 },
+  { code: 'cs-hou', name: '房屋建筑', category: '建筑安装', factor: 1.08 },
+  { code: 'cs-mun', name: '市政工程', category: '建筑安装', factor: 1.15 },
+  { code: 'cs-dec', name: '装饰装修', category: '建筑安装', factor: 0.94 },
+  { code: 'mf-met', name: '金属制品', category: '制造业', factor: 1.02 },
+  { code: 'mf-fod', name: '食品加工', category: '制造业', factor: 0.88 },
+  { code: 'mf-ele', name: '电子设备', category: '制造业', factor: 1.24 },
+  { code: 're-dev', name: '房地产开发', category: '房地产', factor: 1.46 },
+  { code: 'sv-con', name: '商务咨询', category: '商务服务', factor: 1.32 },
+  { code: 'tr-frt', name: '道路货运', category: '交通运输', factor: 0.78 },
+]
+
+/** 可切换的基准指标 */
+const BENCH_METRICS: Array<{ key: string; name: string; unit: string; decimals: number; median: number; std: number }> = [
+  { key: 'vat', name: '增值税税负率', unit: '%', decimals: 2, median: 3.2, std: 0.82 },
+  { key: 'eit', name: '企业所得税贡献率', unit: '%', decimals: 2, median: 1.15, std: 0.36 },
+  { key: 'margin', name: '毛利率', unit: '%', decimals: 1, median: 18.6, std: 5.4 },
+]
+
+/** 区县名列表(生成脱敏样本名用) */
+const DISTRICT_NAMES = Object.keys(DISTRICT_CN).map((c) => DISTRICT_CN[c])
+
+interface BenchIndustryData {
+  stat: BoxStat
+  points: BenchmarkPoint[]
+  /** 剔除前原始样本量 */
+  rawCount: number
+}
+
+const BENCH_CACHE: Record<string, BenchIndustryData> = {}
+
+/**
+ * 构造某行业中类在某指标下的样本分布
+ * 样本围绕「行业中位数 × 行业系数」正态分布,另掺入少量极端值以产生离群点;
+ * Q1 / 中位 / Q3 由排序后的样本直接取分位,须端取 1.5 倍 IQR 内的极值(标准箱线口径)。
+ */
+function buildBenchmark(industryCode: string, metricKey: string): BenchIndustryData {
+  const ind = BENCH_INDUSTRIES.filter((i) => i.code === industryCode)[0] || BENCH_INDUSTRIES[0]
+  const met = BENCH_METRICS.filter((m) => m.key === metricKey)[0] || BENCH_METRICS[0]
+  const ii = BENCH_INDUSTRIES.indexOf(ind)
+  const mi = BENCH_METRICS.indexOf(met)
+  const center = met.median * ind.factor
+  const std = met.std * ind.factor
+  const n = 42 + ((ii * 7 + mi * 13) % 38)
+
+  const points: BenchmarkPoint[] = []
+  for (let j = 0; j < n; j++) {
+    const seed = ii * 1301 + mi * 197 + j * 29
+    // 每 14 户掺一个极端值,使箱线图有离群点可画
+    const extreme = j % 14 === 5
+    const z = extreme ? (rand(seed) > 0.5 ? 3.4 + rand(seed + 7) * 1.6 : -(2.9 + rand(seed + 11) * 1.2)) : gauss(seed)
+    const value = +Math.max(0.01, center + std * z).toFixed(met.decimals)
+    // 前 3 户挂真实名称,与评分样本集对齐;其余脱敏
+    const real = j < 3 ? SCORE_DATA[(ii * 7 + j) % SCORE_DATA.length] : null
+    points.push({
+      taxId: real ? real.taxId : `bm-${industryCode}-${j}`,
+      name: real ? real.taxpayerName : `${DISTRICT_NAMES[j % DISTRICT_NAMES.length]}某${ind.name}企业${String(j).padStart(2, '0')}`,
+      value,
+      outlier: false,
+    })
+  }
+
+  const sorted = points.map((p) => p.value).sort((a, b) => a - b)
+  const at = (q: number) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round(q * (sorted.length - 1))))]
+  const q1 = at(0.25)
+  const median = at(0.5)
+  const q3 = at(0.75)
+  const iqr = +(q3 - q1).toFixed(met.decimals)
+  const loFence = q1 - 1.5 * iqr
+  const hiFence = q3 + 1.5 * iqr
+  const inFence = sorted.filter((v) => v >= loFence && v <= hiFence)
+  const lower = +(inFence.length ? inFence[0] : sorted[0]).toFixed(met.decimals)
+  const upper = +(inFence.length ? inFence[inFence.length - 1] : sorted[sorted.length - 1]).toFixed(met.decimals)
+  const outliers = sorted.filter((v) => v < lower || v > upper)
+
+  points.forEach((p) => {
+    p.outlier = p.value < lower || p.value > upper
+  })
+  points.sort((a, b) => a.value - b.value)
+
+  return {
+    rawCount: n + 6 + (ii % 5),
+    points,
+    stat: {
+      industryCode: ind.code,
+      industryName: ind.name,
+      categoryName: ind.category,
+      lower,
+      q1: +q1.toFixed(met.decimals),
+      median: +median.toFixed(met.decimals),
+      q3: +q3.toFixed(met.decimals),
+      upper,
+      iqr,
+      sampleCount: n,
+      outliers,
+      updatedAt: `2026-0${4 + (ii % 4)}-15`,
+    },
+  }
+}
+
+/** 取(并缓存)某行业中类在某指标下的分布 */
+function benchmark(industryCode: string, metricKey: string): BenchIndustryData {
+  const k = `${industryCode}|${metricKey}`
+  if (!BENCH_CACHE[k]) BENCH_CACHE[k] = buildBenchmark(industryCode, metricKey)
+  return BENCH_CACHE[k]
 }
 
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
@@ -2115,6 +2234,85 @@ export const mockClient: ApiClient = {
         total: sorted.length,
         page: query.page,
         pageSize: query.pageSize,
+      })
+    },
+
+    getBenchmarkBoard(metricKey: string): Promise<BenchmarkBoard> {
+      const met = BENCH_METRICS.filter((m) => m.key === metricKey)[0] || BENCH_METRICS[0]
+      const items = BENCH_INDUSTRIES.map((i) => benchmark(i.code, met.key).stat)
+      const totalSample = items.reduce((s, i) => s + i.sampleCount, 0)
+      const spread = items.map((i) => i.median)
+      return delay({
+        metric: { key: met.key, name: met.name, unit: met.unit, decimals: met.decimals },
+        metrics: BENCH_METRICS.map((m) => ({ value: m.key, label: m.name })),
+        method: '按行业中类分组,剔除非正常户后取分位数;箱体为 Q1–Q3,须端为 1.5 倍 IQR 内极值',
+        items,
+        kpis: [
+          { label: '覆盖行业中类', value: String(items.length), unit: '个', accent: 'primary' },
+          { label: '入样企业', value: totalSample.toLocaleString('en-US'), unit: '户', accent: 'teal' },
+          {
+            label: `${met.name}中位区间`,
+            value: `${Math.min(...spread).toFixed(met.decimals)}–${Math.max(...spread).toFixed(met.decimals)}`,
+            unit: met.unit,
+            accent: 'green',
+          },
+          { label: '基准更新周期', value: '季度', unit: '', accent: 'gold' },
+        ],
+      })
+    },
+
+    getBenchmarkScatter(industryCode: string, metricKey: string): Promise<BenchmarkScatter> {
+      const met = BENCH_METRICS.filter((m) => m.key === metricKey)[0] || BENCH_METRICS[0]
+      const d = benchmark(industryCode, met.key)
+      return delay({
+        industryName: d.stat.industryName,
+        metric: { key: met.key, name: met.name, unit: met.unit, decimals: met.decimals },
+        lower: d.stat.lower,
+        q1: d.stat.q1,
+        median: d.stat.median,
+        q3: d.stat.q3,
+        upper: d.stat.upper,
+        points: d.points,
+      })
+    },
+
+    getBenchmarkAttribution(industryCode: string, metricKey: string): Promise<BenchmarkAttribution> {
+      const met = BENCH_METRICS.filter((m) => m.key === metricKey)[0] || BENCH_METRICS[0]
+      const d = benchmark(industryCode, met.key)
+      const s = d.stat
+      // 直方图:在须端区间内均分 8 段统计户数
+      const bins = 8
+      const step = (s.upper - s.lower) / bins || 1
+      const histogram: NamedValue[] = []
+      for (let b = 0; b < bins; b++) {
+        const lo = s.lower + step * b
+        const hi = lo + step
+        histogram.push({
+          name: `${lo.toFixed(met.decimals)}~${hi.toFixed(met.decimals)}`,
+          value: d.points.filter((p) => p.value >= lo && (b === bins - 1 ? p.value <= hi : p.value < hi)).length,
+        })
+      }
+      return delay({
+        industryName: s.industryName,
+        metricName: met.name,
+        sampleScope: `全市${s.industryName}行业一般纳税人,统计区间 2025年7月–2026年6月(滚动 12 个月)`,
+        excludeRules: [
+          '剔除当期非正常户、走逃失联户与注销户',
+          '剔除开业不满 12 个月的新办户',
+          '剔除申报收入为 0 或连续零申报 6 个月以上的户',
+          '剔除享受即征即退、免抵退等特殊政策的户',
+          '剔除超出 1.5 倍 IQR 的极值样本(不参与分位测算,仅在图上标注)',
+        ],
+        method: `对有效样本的${met.name}升序排列,取 25% / 50% / 75% 分位为 Q1 / 中位数 / Q3;IQR = Q3 − Q1;须端取 1.5 倍 IQR 范围内的实际极值`,
+        rawCount: d.rawCount,
+        validCount: s.sampleCount,
+        histogram,
+        updates: [
+          { time: '2026-04-15', from: (s.median * 1.06).toFixed(met.decimals), to: s.median.toFixed(met.decimals), reason: '季度滚动更新,纳入本季度新增样本' },
+          { time: '2026-01-15', from: (s.median * 1.11).toFixed(met.decimals), to: (s.median * 1.06).toFixed(met.decimals), reason: '剔除口径调整:新增剔除即征即退企业' },
+          { time: '2025-10-15', from: (s.median * 1.14).toFixed(met.decimals), to: (s.median * 1.11).toFixed(met.decimals), reason: '季度滚动更新' },
+        ],
+        note: '基准值仅作为风险识别的参照系,企业指标偏离基准不必然意味着涉税问题;实际经营模式、政策适用差异均可能导致合理偏离。',
       })
     },
 

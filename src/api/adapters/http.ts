@@ -13,6 +13,9 @@ import type {
   AbnormalRow,
   ApiClient,
   ArchiveDeclare,
+  BenchmarkAttribution,
+  BenchmarkBoard,
+  BenchmarkScatter,
   ArchiveEvaluation,
   ArchiveInvoice,
   ArchiveSummary,
@@ -286,6 +289,15 @@ export const httpClient: ApiClient = {
     },
     getAbnormalDetail(taxId: string): Promise<AbnormalDetail> {
       return get<AbnormalDetail>(`/model/abnormal/${encodeURIComponent(taxId)}`)
+    },
+    getBenchmarkBoard(metricKey: string): Promise<BenchmarkBoard> {
+      return get<BenchmarkBoard>('/model/benchmark/board', { metricKey })
+    },
+    getBenchmarkScatter(industryCode: string, metricKey: string): Promise<BenchmarkScatter> {
+      return get<BenchmarkScatter>('/model/benchmark/scatter', { industryCode, metricKey })
+    },
+    getBenchmarkAttribution(industryCode: string, metricKey: string): Promise<BenchmarkAttribution> {
+      return get<BenchmarkAttribution>('/model/benchmark/attribution', { industryCode, metricKey })
     },
   },
 

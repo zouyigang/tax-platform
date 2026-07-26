@@ -190,6 +190,32 @@ export const PARALLEL = {
   dotFill: '#FFFFFF',
 }
 
+/** 智能模型·行业税负基准配色(箱线图 / 散点分布) */
+export const BENCH = {
+  /** 箱体填充 / 描边 */
+  box: '#5FA8D3',
+  boxStroke: '#1D5A99',
+  /** 选中行业的箱体 */
+  boxActive: '#1D5A99',
+  /** 中位数线 */
+  median: '#16436F',
+  /** 上下须 */
+  whisker: '#6E7C8B',
+  /** 离群点 */
+  outlier: '#C0392B',
+  /** 散点(正常 / 离群 / 定位命中) */
+  dot: '#5A7189',
+  dotOutlier: '#C0392B',
+  dotFound: '#C9A227',
+  /** Q1–Q3 参考带 */
+  band: '#1D5A99',
+  bandOpacity: 0.08,
+  /** 网格线 / 轴文字 */
+  grid: '#EAEEF3',
+  axis: '#97A3B0',
+  axisText: '#4C5A68',
+}
+
 // KPI 顶部色条与变化文案的取色已迁移:
 //   色条 → tokens.css 的 --kpi-accent-*(由 MetricCard 直接引用)
 //   文案 → components/common/tone.ts 的 DELTA_TONE(映射到 .tone-* 类)

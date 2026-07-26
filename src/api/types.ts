@@ -2444,6 +2444,131 @@ export interface AbnormalDetail {
   suggestion: string
 }
 
+/* ------------------------------------------------------------------------
+ * 智能模型 · 行业税负基准(《需求文档》3.5.2)
+ * 这是图表驱动页,不是列表页:主体是分布本身而非某一户。
+ * 输出的是「参照系」——供异常申报检测、风险评分与规则阈值取用的行业基准值,
+ * 因此归因说明的是**基准怎么算出来的**(样本口径 / 剔除规则 / 计算方法 / 调整记录),
+ * 而不是某一户为什么得这个分。
+ * ---------------------------------------------------------------------- */
+
+/** 基准指标定义 */
+export interface BenchmarkMetric {
+  /** 指标键 */
+  key: string
+  /** 指标名称 */
+  name: string
+  /** 单位 */
+  unit: string
+  /** 展示小数位 */
+  decimals: number
+}
+
+/** 单个行业中类的箱线统计 */
+export interface BoxStat {
+  /** 行业中类编码 */
+  industryCode: string
+  /** 行业中类名称 */
+  industryName: string
+  /** 所属行业门类(用于分组着色) */
+  categoryName: string
+  /** 下须端(1.5 倍 IQR 内的最小值) */
+  lower: number
+  /** 下四分位 Q1 */
+  q1: number
+  /** 中位数 */
+  median: number
+  /** 上四分位 Q3 */
+  q3: number
+  /** 上须端(1.5 倍 IQR 内的最大值) */
+  upper: number
+  /** 四分位距 IQR = Q3 − Q1 */
+  iqr: number
+  /** 有效样本量(户) */
+  sampleCount: number
+  /** 离群点取值(须端之外) */
+  outliers: number[]
+  /** 基准更新时间 */
+  updatedAt: string
+}
+
+/** 行业税负基准·总览(箱线图 + 基准值表) */
+export interface BenchmarkBoard {
+  /** 当前指标 */
+  metric: BenchmarkMetric
+  /** 可切换指标选项 */
+  metrics: FilterOption[]
+  /** 测算方法说明 */
+  method: string
+  /** 各行业中类的箱线统计(自左向右即横轴顺序) */
+  items: BoxStat[]
+  /** 概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+}
+
+/** 行业内单户散点 */
+export interface BenchmarkPoint {
+  /** 纳税人识别号 */
+  taxId: string
+  /** 纳税人名称(支持按名称定位) */
+  name: string
+  /** 指标取值 */
+  value: number
+  /** 是否为离群点(须端之外) */
+  outlier: boolean
+}
+
+/** 某行业中类的企业散点分布 */
+export interface BenchmarkScatter {
+  /** 行业中类名称 */
+  industryName: string
+  /** 当前指标 */
+  metric: BenchmarkMetric
+  /** 下须端 / Q1 / 中位数 / Q3 / 上须端(画参考带) */
+  lower: number
+  q1: number
+  median: number
+  q3: number
+  upper: number
+  /** 散点(按取值升序) */
+  points: BenchmarkPoint[]
+}
+
+/** 基准调整记录 */
+export interface BenchmarkUpdateLog {
+  /** 调整时间 */
+  time: string
+  /** 调整前中位数 */
+  from: string
+  /** 调整后中位数 */
+  to: string
+  /** 调整事由 */
+  reason: string
+}
+
+/** 基准测算归因(说明基准值的来历) */
+export interface BenchmarkAttribution {
+  /** 行业中类名称 */
+  industryName: string
+  /** 指标名称 */
+  metricName: string
+  /** 样本范围口径 */
+  sampleScope: string
+  /** 入样前的剔除规则 */
+  excludeRules: string[]
+  /** 计算方法 */
+  method: string
+  /** 剔除前后样本量 */
+  rawCount: number
+  validCount: number
+  /** 样本分布直方图(区间 → 户数) */
+  histogram: NamedValue[]
+  /** 历次基准调整记录 */
+  updates: BenchmarkUpdateLog[]
+  /** 使用提示 */
+  note: string
+}
+
 /** 智能模型接口分组 */
 export interface ModelApi {
   /** 风险评分模型·模型态(版本 / Lift / 特征重要性) */
@@ -2468,6 +2593,12 @@ export interface ModelApi {
   getAbnormals(query: AbnormalQuery): Promise<PagedResult<AbnormalRow>>
   /** 异常申报·单户维度偏离归因 */
   getAbnormalDetail(taxId: string): Promise<AbnormalDetail>
+  /** 行业税负基准·总览(某指标下各行业中类的箱线统计) */
+  getBenchmarkBoard(metricKey: string): Promise<BenchmarkBoard>
+  /** 行业税负基准·某行业中类的企业散点分布 */
+  getBenchmarkScatter(industryCode: string, metricKey: string): Promise<BenchmarkScatter>
+  /** 行业税负基准·基准测算归因(样本口径 / 剔除规则 / 计算方法 / 调整记录) */
+  getBenchmarkAttribution(industryCode: string, metricKey: string): Promise<BenchmarkAttribution>
 }
 
 /* ========================================================================

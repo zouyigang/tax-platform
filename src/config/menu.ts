@@ -192,12 +192,7 @@ export const MENU: MenuEntry[] = [
         key: 'model-industry-benchmark',
         title: '行业税负基准',
         path: '/model/industry-benchmark',
-        status: 'placeholder',
-        desc: [
-          '按行业、规模、地区测算税负、毛利、投入产出等基准区间。',
-          '为异常识别与评分模型提供参照系。',
-          '对应需求 3.5.2 行业基准分析。',
-        ],
+        status: 'done',
       },
     ],
   },
