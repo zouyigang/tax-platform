@@ -230,8 +230,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
                 <div class="info__row"><span class="info__k">训练完成</span><span class="info__v num">{{ ms.info.trainedAt }}</span></div>
                 <div class="info__row"><span class="info__k">上线时间</span><span class="info__v num">{{ ms.info.publishedAt }}</span></div>
                 <div class="info__row"><span class="info__k">训练样本</span><span class="info__v num">{{ fmt(ms.info.sampleCount) }} 户(正样本 {{ ms.info.positiveRate }}%)</span></div>
-                <div class="info__row"><span class="info__k">入模特征</span><span class="info__v num">{{ ms.info.featureCount }} 个</span></div>
-                <div class="info__row"><span class="info__k">基准分</span><span class="info__v num">{{ ms.info.baseScore }} 分</span></div>
+                <div class="info__row"><span class="info__k">入模特征</span><span class="info__v num">{{ ms.info.featureCount }} 个 · 基准分 {{ ms.info.baseScore }}</span></div>
                 <div class="info__row"><span class="info__k">下次重训</span><span class="info__v num">{{ ms.info.nextTrainAt }}</span></div>
               </div>
               <div class="metrics">
@@ -256,7 +255,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 
             <PanelCard title="特征重要性 TOP20" subtitle="归一化贡献 %">
               <div class="score__feat">
-                <HBarList :items="featureItems" unit="%" :rank-color="false" name-width="150px" />
+                <HBarList :items="featureItems" unit="%" :rank-color="false" name-width="132px" />
               </div>
               <p class="score__hint">
                 TOP20 合计 {{ featureCovered.toFixed(1) }}%,其余 {{ ms.info.featureCount - 20 }} 个特征合计 {{ (100 - featureCovered).toFixed(1) }}%。
@@ -525,11 +524,18 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 /* ---------- 模型态 ---------- */
 .score__model {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
+  /* 第三列(特征清单)最宽:名称列占位大,条形需要留出可读长度 */
+  grid-template-columns: 1fr 1.15fr 1.2fr;
   gap: var(--space-4);
-  height: 316px;
+  /* 高度按「6 行信息 + 2×2 指标卡」实测留足,避免卡片内容溢出压到下一区段 */
+  height: 366px;
+}
+/* 面板内容一律不外溢:内部区域自行滚动(特征清单) */
+.score__model :deep(.panel-card__body) {
+  overflow: hidden;
 }
 .info {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -550,10 +556,15 @@ const fmt = (n: number) => n.toLocaleString('en-US')
   color: var(--color-neutral-800);
 }
 .metrics {
+  flex: none;
   margin-top: auto;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-2);
+}
+/* 指标卡在此处仅作紧凑陈列,压缩其默认内边距 */
+.metrics :deep(.metric) {
+  padding: 9px 12px;
 }
 .score__feat {
   flex: 1;
