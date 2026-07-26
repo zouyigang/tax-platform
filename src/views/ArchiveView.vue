@@ -179,6 +179,11 @@ function openSwitch() {
   searchOpen.value = true
   advancedOpen.value = false
 }
+/** 展开高级筛选:筛选项懒加载,用户不展开就不请求 */
+function toggleAdvanced() {
+  advancedOpen.value = !advancedOpen.value
+  if (advancedOpen.value && searchFilters.status.value === 'idle') searchFilters.load()
+}
 
 /* ---------------- 快捷列表 ---------------- */
 const keyList = useResource(() => api.archive.getMyKeyTaxpayers())
@@ -251,7 +256,7 @@ const taxSum = computed(() => {
             @select="selectTaxpayer"
             @submit="runSearch"
           />
-          <button type="button" class="btn" @click="advancedOpen = !advancedOpen">
+          <button type="button" class="btn" @click="toggleAdvanced">
             高级筛选 {{ advancedOpen ? '▲' : '▼' }}
             <span v-if="activeFilterCount" class="search__count num">{{ activeFilterCount }}</span>
           </button>
@@ -259,30 +264,39 @@ const taxSum = computed(() => {
           <button v-if="taxId" type="button" class="btn" @click="searchOpen = false">取消</button>
         </div>
 
-        <div v-if="advancedOpen && searchFilters.data.value" class="adv">
-          <div class="adv__item">
-            <label>行业</label>
-            <BaseSelect v-model="industryCode" :options="searchFilters.data.value.industries" width="100%" />
-          </div>
-          <div class="adv__item">
-            <label>登记状态</label>
-            <BaseSelect v-model="regStatus" :options="searchFilters.data.value.regStatuses" width="100%" />
-          </div>
-          <div class="adv__item adv__item--wide">
-            <label>主管税务机关</label>
-            <BaseSelect v-model="authorityCode" :options="searchFilters.data.value.authorities" width="100%" />
-          </div>
-          <div class="adv__item">
-            <label>风险等级</label>
-            <BaseSelect v-model="riskLevel" :options="searchFilters.data.value.riskLevels" width="100%" />
-          </div>
-          <div class="adv__item">
-            <label>纳税人资格</label>
-            <BaseSelect v-model="qualification" :options="searchFilters.data.value.qualifications" width="100%" />
-          </div>
-          <div class="adv__act">
-            <button type="button" class="btn" @click="resetFilters">重置筛选</button>
-          </div>
+        <!-- 筛选项取数失败时给出可重试的提示,而不是让面板静默空着 -->
+        <div v-if="advancedOpen" class="adv-wrap">
+          <StateBlock
+            :status="searchFilters.status.value"
+            :error="searchFilters.error.value"
+            @retry="searchFilters.load()"
+          >
+            <div v-if="searchFilters.data.value" class="adv">
+              <div class="adv__item">
+                <label>行业</label>
+                <BaseSelect v-model="industryCode" :options="searchFilters.data.value.industries" width="100%" />
+              </div>
+              <div class="adv__item">
+                <label>登记状态</label>
+                <BaseSelect v-model="regStatus" :options="searchFilters.data.value.regStatuses" width="100%" />
+              </div>
+              <div class="adv__item adv__item--wide">
+                <label>主管税务机关</label>
+                <BaseSelect v-model="authorityCode" :options="searchFilters.data.value.authorities" width="100%" />
+              </div>
+              <div class="adv__item">
+                <label>风险等级</label>
+                <BaseSelect v-model="riskLevel" :options="searchFilters.data.value.riskLevels" width="100%" />
+              </div>
+              <div class="adv__item">
+                <label>纳税人资格</label>
+                <BaseSelect v-model="qualification" :options="searchFilters.data.value.qualifications" width="100%" />
+              </div>
+              <div class="adv__act">
+                <button type="button" class="btn" @click="resetFilters">重置筛选</button>
+              </div>
+            </div>
+          </StateBlock>
         </div>
       </section>
 
@@ -651,13 +665,15 @@ const taxSum = computed(() => {
   border-radius: var(--radius-control);
   padding: 0 5px;
 }
+.adv-wrap {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-neutral-200);
+}
 .adv {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-3);
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-neutral-200);
 }
 .adv__item {
   min-width: 0;
