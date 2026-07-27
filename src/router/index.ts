@@ -37,6 +37,8 @@ import DocGenView from '@/views/app/DocGenView.vue'
 import NlQueryView from '@/views/app/NlQueryView.vue'
 import DataPermissionView from '@/views/system/DataPermissionView.vue'
 import AuditLogView from '@/views/system/AuditLogView.vue'
+import UserRoleView from '@/views/system/UserRoleView.vue'
+import ParamsView from '@/views/system/ParamsView.vue'
 import TrialView from '@/views/ruleops/TrialView.vue'
 import ThresholdView from '@/views/ruleops/ThresholdView.vue'
 import EffectMonitorView from '@/views/ruleops/EffectMonitorView.vue'
@@ -56,6 +58,8 @@ const DONE_VIEWS: Record<string, Component> = {
   'app-nl-query': NlQueryView,
   'system-data-permission': DataPermissionView,
   'system-audit-log': AuditLogView,
+  'system-user': UserRoleView,
+  'system-params': ParamsView,
   'model-score': ScoreView,
   'model-graph': GraphView,
   'model-fraud-gang': FraudGangView,

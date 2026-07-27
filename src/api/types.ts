@@ -3918,6 +3918,103 @@ export interface AuditOverview {
   defaultTo: string
 }
 
+/* ---- 用户与权限(标准 RBAC) ---- */
+
+/** 用户状态:正常 / 停用 / 锁定 */
+export type UserStatus = 'active' | 'disabled' | 'locked'
+
+/** 系统角色 */
+export interface SysRole {
+  /** 角色 id */
+  id: string
+  /** 角色名称 */
+  name: string
+  /** 职责说明 */
+  desc: string
+  /** 关联用户数 */
+  userCount: number
+}
+
+/** 系统用户 */
+export interface SysUserRow {
+  /** 用户 id */
+  id: string
+  /** 姓名 */
+  name: string
+  /** 工号 */
+  empNo: string
+  /** 所属单位 */
+  dept: string
+  /** 角色 id */
+  roleId: string
+  /** 角色名称 */
+  roleName: string
+  /** 账号状态 */
+  status: UserStatus
+  /** 最后登录时间;从未登录为空串 */
+  lastLogin: string
+}
+
+/** 功能权限动作:查看 / 编辑 / 导出 */
+export type PermAction = 'view' | 'edit' | 'export'
+
+/** 角色 × 菜单 的一行权限 */
+export interface RolePermRow {
+  /** 菜单叶子 key */
+  menuKey: string
+  /** 菜单名称 */
+  menuName: string
+  /** 所属一级分组名 */
+  groupName: string
+  /** 三种动作的授权状态 */
+  actions: Record<PermAction, boolean>
+}
+
+/** 角色权限矩阵 */
+export interface RolePermMatrix {
+  /** 角色 id */
+  roleId: string
+  /** 角色名称 */
+  roleName: string
+  /** 逐菜单的权限行 */
+  rows: RolePermRow[]
+}
+
+/* ---- 系统参数 ---- */
+
+/** 参数控件类型 */
+export type ParamType = 'text' | 'number' | 'select' | 'switch'
+
+/** 一项系统参数 */
+export interface SysParam {
+  /** 参数键 */
+  key: string
+  /** 参数名 */
+  label: string
+  /** 参数说明 */
+  desc: string
+  /** 控件类型 */
+  type: ParamType
+  /** 当前值(统一以字符串承载,switch 用 '1' / '0') */
+  value: string
+  /** 单位;可空 */
+  unit: string
+  /** select 的可选值;其余类型为空数组 */
+  options: FilterOption[]
+}
+
+/** 参数分组 */
+export interface ParamGroup {
+  /** 分组键 */
+  key: string
+  /** 分组名称 */
+  name: string
+  /** 分组说明 */
+  desc: string
+  /** 该组参数 */
+  params: SysParam[]
+}
+
 /** 系统管理接口分组 */
 export interface SystemApi {
   /** 数据权限·可配置的主体(角色与用户) */
@@ -3930,6 +4027,14 @@ export interface SystemApi {
   getAuditOverview(): Promise<AuditOverview>
   /** 日志审计·日志列表(敏感操作置顶) */
   getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>>
+  /** 用户与权限·角色列表 */
+  getSysRoles(): Promise<SysRole[]>
+  /** 用户与权限·某角色下的用户;roleId 传 'all' 取全部 */
+  getSysUsers(roleId: string): Promise<SysUserRow[]>
+  /** 用户与权限·角色的菜单功能权限矩阵 */
+  getRolePermMatrix(roleId: string): Promise<RolePermMatrix>
+  /** 系统参数·全部分组与参数项 */
+  getSysParamGroups(): Promise<ParamGroup[]>
 }
 
 /* ========================================================================

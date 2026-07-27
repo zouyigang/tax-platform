@@ -5,6 +5,7 @@
  *       但仍模拟网络延迟以呈现四态中的「加载中」。
  * 禁止被页面组件直接引用,只能经由 src/api/client.ts。
  * ============================================================ */
+import { MENU, isGroup } from '@/config/menu'
 import type {
   AbnormalChart,
   AbnormalDetail,
@@ -148,6 +149,7 @@ import type {
   ShellFeature,
   TaxSourceTier,
   PagedResult,
+  ParamGroup,
   PermSubject,
   QaSession,
   ForecastBoard,
@@ -167,11 +169,17 @@ import type {
   ScoreQuery,
   ScoreRow,
   ShapItem,
+  RolePermMatrix,
+  RolePermRow,
   RowRuleCondition,
   RowRuleEstimate,
   RowRuleOption,
+  SysParam,
+  SysRole,
+  SysUserRow,
   SourceContribution,
   TaxAdvice,
+  UserStatus,
   WorkloadRow,
   TaxpayerBrief,
   TaxpayerQualification,
@@ -2883,6 +2891,204 @@ const AUDIT_LOG_DATA: AuditLogRow[] = (() => {
   return list
 })()
 
+/* ==================== 系统管理:用户与权限 / 系统参数演示数据 ==================== */
+
+/** 角色(与数据权限主体共用同一套定义,避免两处角色对不上) */
+const SYS_ROLES: SysRole[] = PERM_SUBJECTS.filter((s) => s.type === 'role').map((s) => ({
+  id: s.id,
+  name: s.name,
+  desc: s.desc,
+  userCount: s.userCount,
+}))
+
+/** 用户名录(按角色分布,覆盖三种账号状态) */
+const SYS_USER_DATA: SysUserRow[] = (() => {
+  const SURNAME = ['王', '李', '张', '陈', '刘', '赵', '孙', '周', '吴', '郑', '冯', '许']
+  const DEPTS = Object.keys(DISTRICT_CN).map((c) => `${DISTRICT_CN[c]}税务局`).concat(['市局风险管理科', '市局稽查局'])
+  const list: SysUserRow[] = []
+  SYS_ROLES.forEach((role, ri) => {
+    // 每个角色给 4–6 个演示账号
+    const n = 4 + (ri % 3)
+    for (let i = 0; i < n; i++) {
+      const seq = ri * 10 + i
+      const status: UserStatus = seq % 17 === 5 ? 'locked' : seq % 11 === 7 ? 'disabled' : 'active'
+      list.push({
+        id: `U${String(3200 + seq)}`,
+        name: `${SURNAME[seq % SURNAME.length]}××`,
+        empNo: `32${String(1000 + seq)}`,
+        dept: DEPTS[seq % DEPTS.length],
+        roleId: role.id,
+        roleName: role.name,
+        status,
+        // 停用账号不再有登录记录,锁定账号保留最后一次
+        lastLogin: status === 'disabled' ? '' : `2026-07-${String(24 - (seq % 20)).padStart(2, '0')} ${String(8 + (seq % 10)).padStart(2, '0')}:${String((seq * 7) % 60).padStart(2, '0')}`,
+      })
+    }
+  })
+  return list
+})()
+
+/**
+ * 角色权限矩阵
+ * 按角色职责给出差异化的默认授权,而不是一律全开:
+ * 领导查询岗只读、系统管理员不碰业务数据、稽查岗可导出。
+ */
+function buildRolePermMatrix(roleId: string): RolePermMatrix {
+  const role = SYS_ROLES.filter((r) => r.id === roleId)[0] || SYS_ROLES[0]
+  const rows: RolePermRow[] = []
+  MENU.forEach((entry) => {
+    if (!isGroup(entry)) {
+      rows.push({
+        menuKey: entry.key,
+        menuName: entry.title,
+        groupName: '—',
+        actions: { view: true, edit: false, export: role.id !== 'role-leader' },
+      })
+      return
+    }
+    entry.children.forEach((leaf) => {
+      const isSystem = entry.key === 'system'
+      const isRules = entry.key === 'rules'
+      const isRisk = entry.key === 'risk'
+      let view = true
+      let edit = false
+      let exp = false
+      if (role.id === 'role-admin') {
+        // 运维岗:只管系统配置,不进业务数据
+        view = isSystem
+        edit = isSystem
+        exp = false
+      } else if (role.id === 'role-leader') {
+        // 领导查询岗:全只读,不导出、不编辑
+        view = !isSystem
+        edit = false
+        exp = false
+      } else if (role.id === 'role-city-analyst') {
+        view = !isSystem
+        edit = false
+        exp = true
+      } else if (role.id === 'role-district-admin') {
+        view = !isSystem || leaf.key === 'system-user'
+        edit = isRisk
+        exp = true
+      } else if (role.id === 'role-source-manager') {
+        view = !isSystem
+        edit = isRisk
+        exp = entry.key === 'risk' || entry.key === 'data'
+      } else if (role.id === 'role-inspector') {
+        view = !isSystem
+        edit = isRisk || isRules
+        exp = true
+      }
+      rows.push({
+        menuKey: leaf.key,
+        menuName: leaf.title,
+        groupName: entry.title,
+        actions: { view, edit, export: exp },
+      })
+    })
+  })
+  return { roleId: role.id, roleName: role.name, rows }
+}
+
+/** 系统参数分组 */
+const SYS_PARAM_GROUPS: ParamGroup[] = [
+  {
+    key: 'basic',
+    name: '基础配置',
+    desc: '平台级基础运行参数',
+    params: [
+      { key: 'platformName', label: '平台名称', desc: '显示在浏览器标题与登录页', type: 'text', value: '智慧综合治税与税收风险智能分析平台', unit: '', options: [] },
+      { key: 'sessionTimeout', label: '会话超时时长', desc: '无操作超过该时长自动登出', type: 'number', value: '30', unit: '分钟', options: [] },
+      { key: 'pageSize', label: '列表默认每页条数', desc: '各业务列表的初始分页大小', type: 'select', value: '20', unit: '', options: [
+        { value: '10', label: '10 条' },
+        { value: '20', label: '20 条' },
+        { value: '50', label: '50 条' },
+      ] },
+      { key: 'watermark', label: '页面水印', desc: '在业务页叠加操作人工号水印,便于截屏溯源', type: 'switch', value: '1', unit: '', options: [] },
+    ],
+  },
+  {
+    key: 'sync',
+    name: '数据同步',
+    desc: '外部数据接入与同步调度',
+    params: [
+      { key: 'syncWindow', label: '数据同步时间窗口', desc: '每日抽取外部数据的执行时段,避开征期高峰', type: 'select', value: '01-05', unit: '', options: [
+        { value: '00-04', label: '00:00 — 04:00' },
+        { value: '01-05', label: '01:00 — 05:00' },
+        { value: '02-06', label: '02:00 — 06:00' },
+      ] },
+      { key: 'syncRetry', label: '同步失败重试次数', desc: '单个数据源同步失败后的自动重试上限', type: 'number', value: '3', unit: '次', options: [] },
+      { key: 'syncTimeout', label: '单源同步超时', desc: '超过该时长视为本次同步失败', type: 'number', value: '45', unit: '分钟', options: [] },
+      { key: 'syncAlert', label: '同步中断即时告警', desc: '数据源中断时立即推送给运维人员', type: 'switch', value: '1', unit: '', options: [] },
+    ],
+  },
+  {
+    key: 'engine',
+    name: '规则引擎',
+    desc: '规则批处理与线索生成',
+    params: [
+      { key: 'batchConcurrency', label: '规则批处理并发数', desc: '同时执行的规则任务数,过高会挤占数据库资源', type: 'number', value: '8', unit: '个', options: [] },
+      { key: 'batchWindow', label: '规则批处理执行时间', desc: '全库规则扫描的启动时刻', type: 'select', value: '05:30', unit: '', options: [
+        { value: '04:30', label: '每日 04:30' },
+        { value: '05:30', label: '每日 05:30' },
+        { value: '06:30', label: '每日 06:30' },
+      ] },
+      { key: 'clueDailyLimit', label: '线索单日派发上限', desc: '单个承办人每日可被派发的线索条数上限', type: 'number', value: '15', unit: '条', options: [] },
+      { key: 'clueDedup', label: '线索自动去重', desc: '同一纳税人同一规则 30 日内不重复生成线索', type: 'switch', value: '1', unit: '', options: [] },
+    ],
+  },
+  {
+    key: 'model',
+    name: '模型服务',
+    desc: '风险评分与识别模型的运行参数',
+    params: [
+      { key: 'retrainCycle', label: '模型重训周期', desc: '风险评分模型的定期重训频率', type: 'select', value: 'quarter', unit: '', options: [
+        { value: 'month', label: '每月' },
+        { value: 'quarter', label: '每季度' },
+        { value: 'halfYear', label: '每半年' },
+      ] },
+      { key: 'scoreThreshold', label: '高风险分阈值', desc: '风险分达到该值判定为高风险', type: 'number', value: '80', unit: '分', options: [] },
+      { key: 'modelTimeout', label: '模型推理超时', desc: '单次批量推理的超时时间', type: 'number', value: '120', unit: '秒', options: [] },
+      { key: 'modelFallback', label: '模型不可用时降级', desc: '模型服务异常时自动回退到规则引擎结果', type: 'switch', value: '1', unit: '', options: [] },
+    ],
+  },
+  {
+    key: 'llm',
+    name: '大模型服务',
+    desc: '政策问答、文书生成、自然语言取数共用的大模型接入',
+    params: [
+      { key: 'llmEndpoint', label: '大模型服务地址', desc: '政务内网私有化部署地址,不出网', type: 'text', value: 'http://10.20.30.40:8000/v1', unit: '', options: [] },
+      { key: 'llmModel', label: '默认模型', desc: '各智能应用未单独指定时使用的模型', type: 'select', value: 'gov-14b', unit: '', options: [
+        { value: 'gov-7b', label: '政务大模型 7B' },
+        { value: 'gov-14b', label: '政务大模型 14B' },
+        { value: 'gov-32b', label: '政务大模型 32B' },
+      ] },
+      { key: 'llmTimeout', label: '调用超时时间', desc: '超过该时长返回超时提示,不做无限等待', type: 'number', value: '60', unit: '秒', options: [] },
+      { key: 'llmLog', label: '记录问答日志', desc: '留存提问与回答内容以备审计;含敏感数据时按脱敏规则存储', type: 'switch', value: '1', unit: '', options: [] },
+    ],
+  },
+  {
+    key: 'notify',
+    name: '消息通知',
+    desc: '预警与任务提醒的推送方式',
+    params: [
+      { key: 'alertChannel', label: '预警通知渠道', desc: '风险预警与异常告警的推送方式', type: 'select', value: 'inner', unit: '', options: [
+        { value: 'inner', label: '站内消息' },
+        { value: 'innerSms', label: '站内消息 + 短信' },
+        { value: 'innerMail', label: '站内消息 + 邮件' },
+      ] },
+      { key: 'dueRemind', label: '任务临期提醒', desc: '任务到期前提前提醒承办人的天数', type: 'number', value: '2', unit: '天', options: [] },
+      { key: 'overdueEscalate', label: '超期上报上级', desc: '任务超期后同时通知其所在分局负责人', type: 'switch', value: '1', unit: '', options: [] },
+      { key: 'quietHours', label: '免打扰时段', desc: '该时段内不推送非紧急提醒', type: 'select', value: '22-07', unit: '', options: [
+        { value: 'off', label: '不启用' },
+        { value: '22-07', label: '22:00 — 07:00' },
+        { value: '21-08', label: '21:00 — 08:00' },
+      ] },
+    ],
+  },
+]
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -4628,6 +4834,22 @@ export const mockClient: ApiClient = {
         defaultFrom: '2026-07-23',
         defaultTo: '2026-07-24',
       })
+    },
+
+    getSysRoles(): Promise<SysRole[]> {
+      return delay(SYS_ROLES)
+    },
+
+    getSysUsers(roleId: string): Promise<SysUserRow[]> {
+      return delay(roleId === 'all' ? SYS_USER_DATA : SYS_USER_DATA.filter((u) => u.roleId === roleId))
+    },
+
+    getRolePermMatrix(roleId: string): Promise<RolePermMatrix> {
+      return delay(buildRolePermMatrix(roleId))
+    },
+
+    getSysParamGroups(): Promise<ParamGroup[]> {
+      return delay(SYS_PARAM_GROUPS)
     },
 
     getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>> {

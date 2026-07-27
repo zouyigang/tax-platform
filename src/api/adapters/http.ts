@@ -93,10 +93,14 @@ import type {
   NlAnswer,
   NlSession,
   PagedResult,
+  ParamGroup,
   PermSubject,
   QaSession,
+  RolePermMatrix,
   RowRuleCondition,
   RowRuleEstimate,
+  SysRole,
+  SysUserRow,
   ForecastBoard,
   RevenueTrend,
   RiskTaskFunnel,
@@ -308,6 +312,18 @@ export const httpClient: ApiClient = {
     },
     getAuditOverview(): Promise<AuditOverview> {
       return get<AuditOverview>('/system/audit/overview')
+    },
+    getSysRoles(): Promise<SysRole[]> {
+      return get<SysRole[]>('/system/roles')
+    },
+    getSysUsers(roleId: string): Promise<SysUserRow[]> {
+      return get<SysUserRow[]>('/system/users', { roleId })
+    },
+    getRolePermMatrix(roleId: string): Promise<RolePermMatrix> {
+      return get<RolePermMatrix>(`/system/roles/${encodeURIComponent(roleId)}/permissions`)
+    },
+    getSysParamGroups(): Promise<ParamGroup[]> {
+      return get<ParamGroup[]>('/system/params')
     },
     getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>> {
       return get<PagedResult<AuditLogRow>>('/system/audit/logs', {

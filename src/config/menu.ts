@@ -296,12 +296,7 @@ export const MENU: MenuEntry[] = [
         key: 'system-user',
         title: '用户与权限',
         path: '/system/user',
-        status: 'placeholder',
-        desc: [
-          '管理用户、角色、菜单与功能权限。',
-          '支持组织机构映射与账号生命周期管理。',
-          '对应需求 10.2 权限管理。',
-        ],
+        status: 'done',
       },
       {
         key: 'system-data-permission',
@@ -319,11 +314,7 @@ export const MENU: MenuEntry[] = [
         key: 'system-params',
         title: '系统参数',
         path: '/system/params',
-        status: 'placeholder',
-        desc: [
-          '维护平台级全局参数、字典与运行配置。',
-          '支持参数分组、变更记录与热更新。',
-        ],
+        status: 'done',
       },
     ],
   },
