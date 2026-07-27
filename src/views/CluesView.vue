@@ -3,19 +3,20 @@
  * 核查处置工作台(《需求文档》7.3 / 7.4)· 办理人视角
  * 与「风险线索池」的分工:线索池是管理者视角(全局线索、批量派发),
  * 本页是办理人视角 —— 无参数进来看「我的待办」,带参数进来直接办这一条。
- *   办理界面:左 风险点明细(放大)+ 比对数据对照 + 核查过程时间线
- *            右 结果回填表单(7.4)+ 证据材料上传
+ *   办理界面:左 风险点明细(放大)+ 比对数据对照(填表时需常驻可见,不进标签)
+ *            右 标签页:结果回填表单(7.4)+ 证据材料上传 / 核查过程时间线
  * 顶部提供「返回我的待办」与上一条/下一条,方便连续办理。
  * 取数经 @/api/client;提交/退回走二次确认(《交互说明》4.3),成功以 toast 反馈。
  */
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/client'
-import type { MyTaskRow } from '@/api/types'
+import type { FilterOption, MyTaskRow } from '@/api/types'
 import { useResource } from '@/composables/useResource'
 import StateBlock from '@/components/StateBlock.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import BaseBadge from '@/components/common/BaseBadge.vue'
+import TabNav from '@/components/common/TabNav.vue'
 import ConfirmModal from '@/components/common/ConfirmModal.vue'
 import Toast from '@/components/common/Toast.vue'
 import DisposalForm from '@/components/clues/DisposalForm.vue'
@@ -70,17 +71,34 @@ function goStep(step: number) {
   router.push({ path: '/clues', query: { taskId: taskList.value[i].clueId } })
 }
 
-/* ---------------- 结果回填定位 ---------------- */
-/** 结果回填页跳过来时带 tab=result,进入后滚动到回填表单并高亮一次 */
+/* ---------------- 右栏标签页:结果回填 / 核查过程 ---------------- */
+/**
+ * 时间线放进右栏与回填表单同层做标签页,而不是把整页切成三个标签:
+ * 办理人填表时必须能同时看到左栏的风险点与比对数据,那部分不能被标签藏起来。
+ */
+const FORM_TABS: FilterOption[] = [
+  { value: 'result', label: '结果回填' },
+  { value: 'process', label: '核查过程' },
+]
+const formTab = ref<'result' | 'process'>('result')
+
 const formEl = ref<HTMLElement | null>(null)
 const formFlash = ref(false)
+/** 从结果回填页带 ?tab=result 进来:切到回填标签页,滚动到位并高亮一次 */
 async function focusResultForm() {
+  formTab.value = 'result'
   await nextTick()
   const el = formEl.value
   if (!el) return
-  el.scrollIntoView({ block: 'start' })
+  el.scrollIntoView({ block: 'nearest' })
   formFlash.value = true
   window.setTimeout(() => (formFlash.value = false), 1600)
+}
+/** 读取 URL 上的标签页参数 */
+function applyTabFromRoute() {
+  const t = route.query.tab
+  if (t === 'result') focusResultForm()
+  else if (t === 'process') formTab.value = 'process'
 }
 
 onMounted(async () => {
@@ -89,13 +107,15 @@ onMounted(async () => {
   await tasks.load()
   if (clueId.value) {
     loadAll()
-    if (route.query.tab === 'result') focusResultForm()
+    applyTabFromRoute()
   }
 })
 
 watch(clueId, () => {
   loadAll()
-  if (clueId.value && route.query.tab === 'result') focusResultForm()
+  // 切换任务时回到默认标签页,除非 URL 明确指定
+  formTab.value = 'result'
+  if (clueId.value) applyTabFromRoute()
 })
 
 /** 概览卡 → 该户一户式档案 */
@@ -306,10 +326,40 @@ const TASK_STATUS_TONE: Record<string, 'pending' | 'primary' | 'gold' | 'danger'
                 </div>
               </section>
 
-              <section class="card">
-                <div class="card__title">核查过程</div>
+            </div>
+
+            <!-- 右:结果回填 / 核查过程 两个标签页 -->
+            <div class="wb__col wb__col--right">
+              <section ref="formEl" class="card" :class="{ 'card--flash': formFlash }">
+                <div class="card__tabs">
+                  <TabNav v-model="formTab" :tabs="FORM_TABS" size="sm" />
+                  <BaseBadge
+                    :tone="CLUE_STATUS_TONE[detail.data.value.status]"
+                    variant="dot"
+                    class="card__tabs-badge"
+                  >
+                    {{ CLUE_STATUS_LABEL[detail.data.value.status] }}
+                  </BaseBadge>
+                </div>
+
                 <div class="card__body">
-                  <div class="timeline">
+                  <!-- 结果回填 -->
+                  <StateBlock
+                    v-if="formTab === 'result'"
+                    :status="options.status.value"
+                    :error="options.error.value"
+                    @retry="options.load()"
+                  >
+                    <DisposalForm
+                      v-if="options.data.value"
+                      :options="options.data.value"
+                      @submit="onFormSubmit"
+                      @save-draft="onSaveDraft"
+                    />
+                  </StateBlock>
+
+                  <!-- 核查过程时间线 -->
+                  <div v-else class="timeline">
                     <div
                       v-for="(e, i) in detail.data.value.timeline"
                       :key="i"
@@ -327,36 +377,6 @@ const TASK_STATUS_TONE: Record<string, 'pending' | 'primary' | 'gold' | 'danger'
                       </div>
                     </div>
                   </div>
-                </div>
-              </section>
-            </div>
-
-            <!-- 右:结果回填 -->
-            <div class="wb__col wb__col--right">
-              <section ref="formEl" class="card" :class="{ 'card--flash': formFlash }">
-                <div class="card__title">
-                  结果回填
-                  <BaseBadge
-                    :tone="CLUE_STATUS_TONE[detail.data.value.status]"
-                    variant="dot"
-                    class="card__title-badge"
-                  >
-                    {{ CLUE_STATUS_LABEL[detail.data.value.status] }}
-                  </BaseBadge>
-                </div>
-                <div class="card__body">
-                  <StateBlock
-                    :status="options.status.value"
-                    :error="options.error.value"
-                    @retry="options.load()"
-                  >
-                    <DisposalForm
-                      v-if="options.data.value"
-                      :options="options.data.value"
-                      @submit="onFormSubmit"
-                      @save-draft="onSaveDraft"
-                    />
-                  </StateBlock>
                 </div>
               </section>
             </div>
@@ -560,6 +580,24 @@ const TASK_STATUS_TONE: Record<string, 'pending' | 'primary' | 'gold' | 'danger'
   font-size: var(--fs-micro);
   color: var(--color-neutral-600);
   white-space: nowrap;
+}
+
+/* 右栏标签条:标签与状态徽章同行 */
+.card__tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border-bottom: var(--border-line);
+}
+.card__tabs :deep(.tabs) {
+  border-bottom: none;
+  flex: 1;
+  min-width: 0;
+}
+.card__tabs-badge {
+  flex: none;
 }
 
 /* 从结果回填页跳入时,回填表单闪烁一次以指明落点 */
