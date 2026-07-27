@@ -205,6 +205,12 @@ function backToEmpty() {
   router.push({ path: '/archive' })
 }
 
+/** 档案 → 关联图谱分析,以当前纳税人为图谱根节点 */
+function gotoGraph() {
+  if (!taxId.value) return
+  router.push({ path: '/model/graph', query: { rootId: taxId.value } })
+}
+
 const money = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 1 })
 
 /* ---------------- 分税种表格 ---------------- */
@@ -231,6 +237,7 @@ const taxSum = computed(() => {
   <div class="archive">
     <PageHeader title="一户式主档查询" breadcrumb="首页 / 数据治理 / 一户式主档查询">
       <template #actions>
+        <button type="button" class="btn" :disabled="!taxId" @click="gotoGraph">关联图谱</button>
         <button type="button" class="btn" :disabled="!taxId">导出档案</button>
         <button type="button" class="btn btn--primary" :disabled="!taxId">发起核查</button>
       </template>
@@ -609,6 +616,12 @@ const taxSum = computed(() => {
 
 <style scoped>
 .archive {
+  /* 企业头像占位字 */
+  --ar-avatar: 22px;
+  /* 企业名称 */
+  --ar-name: 20px;
+  /* 信用等级大字 */
+  --ar-grade: 22px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -875,7 +888,7 @@ const taxSum = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: var(--ar-avatar);
   font-weight: var(--fw-semibold);
 }
 .summary__main {
@@ -889,7 +902,7 @@ const taxSum = computed(() => {
   flex-wrap: wrap;
 }
 .summary__name {
-  font-size: 20px;
+  font-size: var(--ar-name);
   font-weight: var(--fw-semibold);
 }
 .summary__meta {
@@ -1023,7 +1036,7 @@ const taxSum = computed(() => {
   text-align: center;
 }
 .credit__grade {
-  font-size: 22px;
+  font-size: var(--ar-grade);
   font-weight: var(--fw-semibold);
   color: var(--tone-main);
 }

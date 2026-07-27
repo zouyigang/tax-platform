@@ -452,6 +452,12 @@ function rateTone(rate: number) {
 
 <style scoped>
 .topic {
+  /* 专题标签 */
+  --tp-tab: 15px;
+  /* 环节金额 / 概览数值 */
+  --tp-amt: 22px;
+  /* 链条箭头 / 平台数值 */
+  --tp-arrow: 18px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -485,7 +491,7 @@ function rateTone(rate: number) {
 }
 .tabbar__item {
   padding: 13px 22px 11px;
-  font-size: 15px;
+  font-size: var(--tp-tab);
   cursor: pointer;
   color: var(--color-text-sub);
   font-weight: var(--fw-regular);
@@ -621,7 +627,7 @@ function rateTone(rate: number) {
   color: var(--color-neutral-500);
 }
 .node__amt {
-  font-size: 22px;
+  font-size: var(--tp-amt);
   font-weight: var(--fw-semibold);
   color: var(--color-primary);
   line-height: 1.5;
@@ -645,7 +651,7 @@ function rateTone(rate: number) {
   align-items: center;
   justify-content: center;
   color: var(--color-neutral-400);
-  font-size: 18px;
+  font-size: var(--tp-arrow);
 }
 
 .detail {
@@ -746,7 +752,7 @@ function rateTone(rate: number) {
   color: var(--color-text-sub);
 }
 .ov__value {
-  font-size: 22px;
+  font-size: var(--tp-amt);
   font-weight: var(--fw-semibold);
   color: var(--tone-text);
 }
@@ -808,7 +814,7 @@ function rateTone(rate: number) {
   color: var(--color-neutral-500);
 }
 .plat__v {
-  font-size: 18px;
+  font-size: var(--tp-arrow);
   font-weight: var(--fw-semibold);
 }
 .plat__v--risk {

@@ -372,6 +372,10 @@ const tableRows = computed<Array<MainRow | SubRow>>(() => {
 
 <style scoped>
 .rev {
+  /* 顶部统计大字 */
+  --rev-stat: 26px;
+  /* 表头排序指示器 */
+  --rev-sort: 10px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -502,7 +506,7 @@ const tableRows = computed<Array<MainRow | SubRow>>(() => {
   color: var(--color-neutral-600);
 }
 .stat__value {
-  font-size: 26px;
+  font-size: var(--rev-stat);
   font-weight: var(--fw-semibold);
   line-height: 1.4;
   color: var(--tone-text);
@@ -644,7 +648,7 @@ const tableRows = computed<Array<MainRow | SubRow>>(() => {
   color: var(--color-primary);
 }
 .tbl__icon {
-  font-size: 10px;
+  font-size: var(--rev-sort);
   color: var(--color-neutral-400);
 }
 .tbl__icon--on {

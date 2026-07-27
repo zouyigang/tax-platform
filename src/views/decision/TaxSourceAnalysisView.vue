@@ -339,6 +339,8 @@ const bubbleChart = computed(() => {
 
 <style scoped>
 .tsa {
+  /* 统计条数值(不在全局字阶内) */
+  --ts-stat: 24px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -436,7 +438,7 @@ const bubbleChart = computed(() => {
   white-space: nowrap;
 }
 .statbar__value {
-  font-size: 24px;
+  font-size: var(--ts-stat);
   font-weight: var(--fw-semibold);
   color: var(--tone-text);
 }

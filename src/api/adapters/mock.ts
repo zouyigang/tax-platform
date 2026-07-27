@@ -2343,7 +2343,8 @@ const TAXPAYER_DATA: TaxpayerBrief[] = SCORE_DATA.map((s, i) => {
   return {
     taxpayerId: s.taxId,
     name: s.taxpayerName,
-    creditCode: `91${String(330100 + i)}${s.taxId.slice(-6)}`,
+    // 前 6 位使用虚构区划码 99xxxx,避免与真实行政区划码重合(合规红线)
+    creditCode: `91${String(990100 + i)}${s.taxId.slice(-6)}`,
     industry: s.industry,
     industryCode: INDUSTRY_CODE_BY_CN[s.industry] || 'wholesale',
     district: s.district,
@@ -2644,24 +2645,24 @@ const MASK_FIELDS: Array<Omit<FieldMaskRow, 'level' | 'reason'>> = [
     key: 'idCard',
     name: '身份证号',
     category: '自然人身份信息',
-    plainSample: '330102199003074512',
-    maskedSample: '3301**********4512',
+    plainSample: '999001199003074512',
+    maskedSample: '9990**********4512',
     basis: '《个人信息保护法》敏感个人信息;查看明文须单独授权并留痕',
   },
   {
     key: 'bankAccount',
     name: '银行账号',
     category: '资金信息',
-    plainSample: '6222 0202 0001 2345 678',
-    maskedSample: '6222 **** **** **** 678',
+    plainSample: '9999 0202 0001 2345 678',
+    maskedSample: '9999 **** **** **** 678',
     basis: '涉及金融账户信息,非资金核查场景不应下放明文',
   },
   {
     key: 'phone',
     name: '联系电话',
     category: '自然人身份信息',
-    plainSample: '138 0013 8000',
-    maskedSample: '138 **** 8000',
+    plainSample: '139 0000 0000',
+    maskedSample: '139 **** 0000',
     basis: '《个人信息保护法》个人信息;按最小必要原则默认掩码',
   },
   {
@@ -3196,7 +3197,18 @@ export const mockClient: ApiClient = {
         { key: 'yoy', label: '同比增幅', value: '6.4', unit: '%', accent: 'teal', delta: '▲ 1.2pct', deltaTone: 'positive', deltaNote: '较上季', linkTo: '' },
         { key: 'budget', label: '预算完成进度', value: '78.5', unit: '%', accent: 'green', delta: '时序进度 75.0%', deltaTone: 'positive', deltaNote: '超序时', linkTo: '' },
         { key: 'govAdd', label: '综合治税增收', value: '1.28', unit: '亿元', accent: 'gold', delta: '▲ 21.3%', deltaTone: 'positive', deltaNote: '同比', linkTo: '/rules/config' },
-        { key: 'riskRate', label: '风险任务处置率', value: '86.3', unit: '%', accent: 'red', delta: '待处置 137 户', deltaTone: 'negative', deltaNote: '剩余', linkTo: '/risk-pool?status=pending' },
+        {
+          key: 'riskRate',
+          label: '风险任务处置率',
+          value: '86.3',
+          unit: '%',
+          // 待处置数与线索池同源,避免驾驶舱与列表对不上(此前写死 137)
+          delta: `待处置 ${CLUE_DATA.filter((c) => c.status === 'pending').length} 条`,
+          accent: 'red',
+          deltaTone: 'negative',
+          deltaNote: '剩余',
+          linkTo: '/risk-pool?status=pending',
+        },
       ])
     },
 
@@ -4306,7 +4318,8 @@ export const mockClient: ApiClient = {
           { label: '本期评分户数', value: '12,486', unit: '户', accent: 'primary' },
           { label: '高风险户数', value: '268', unit: '户', accent: 'red' },
           { label: '较上期新增高风险', value: '42', unit: '户', accent: 'gold' },
-          { label: '已转风险线索', value: '137', unit: '条', accent: 'teal' },
+          // 已转线索数取自线索池数据集,与风险线索池、驾驶舱三处同源
+          { label: '已转风险线索', value: String(CLUE_DATA.length), unit: '条', accent: 'teal' },
         ],
       })
     },
@@ -4670,7 +4683,10 @@ export const mockClient: ApiClient = {
 
   /* ==================== 智能模型 · 关联图谱分析 ==================== */
   graph: {
-    getGraph(_rootId: string): Promise<GraphData> {
+    getGraph(rootId: string): Promise<GraphData> {
+      // 由一户式档案跳入时会带 rootId:把中心节点换成该户,
+      // 否则点「关联图谱」看到的会是另一家企业的图,属于误导
+      const rootTp = TAXPAYER_DATA.filter((t) => t.taxpayerId === rootId)[0]
       /** 企业类节点按名称关联到纳税人名录,便于从图谱直接进其一户式档案 */
       const tpIdOf = (name: string) => {
         const hit = TAXPAYER_DATA.filter((t) => t.name === name)[0]
@@ -4761,7 +4777,12 @@ export const mockClient: ApiClient = {
           }
       })
 
-      return delay({ rootName: '城东区某建材经营部', rootId: 'n1', nodes, edges, details })
+      if (rootTp) {
+        nodes[0].label = rootTp.name
+        nodes[0].taxpayerId = rootTp.taxpayerId
+        nodes[0].risk = rootTp.riskLevel
+      }
+      return delay({ rootName: rootTp ? rootTp.name : '城东区某建材经营部', rootId: 'n1', nodes, edges, details })
     },
   },
 

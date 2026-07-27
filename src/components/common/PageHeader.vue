@@ -19,6 +19,8 @@ defineProps<{
 
 <style scoped>
 .page-header {
+  /* 页面主标题字号(介于 h2 与 h3 之间) */
+  --ph-title: 17px;
   height: 52px;
   flex: none;
   background: var(--color-panel);
@@ -29,7 +31,7 @@ defineProps<{
   gap: var(--space-3);
 }
 .page-header__title {
-  font-size: 17px;
+  font-size: var(--ph-title);
   font-weight: var(--fw-semibold);
   margin: 0;
   white-space: nowrap;

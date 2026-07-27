@@ -155,7 +155,13 @@ async function get<T>(path: string, params: Record<string, string | number | und
     throw new Error('网络异常,服务暂不可用')
   }
   if (!resp.ok) {
-    throw new Error(resp.status === 403 ? '无权限查看该数据' : '数据加载失败')
+    if (resp.status === 403) {
+      // 用 name 标记无权限,供 useResource 区分出「无权限态」而非笼统的错误态
+      const err = new Error('您的数据权限范围不包含该数据')
+      err.name = 'ForbiddenError'
+      throw err
+    }
+    throw new Error('数据加载失败')
   }
   const body = (await resp.json()) as ApiEnvelope<T>
   if (body.code !== 0) {

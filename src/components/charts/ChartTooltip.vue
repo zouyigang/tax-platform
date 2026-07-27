@@ -34,7 +34,7 @@ defineProps<{ tip: TipState }>()
   font-weight: var(--fw-semibold);
   margin-bottom: 6px;
   padding-bottom: 5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid var(--color-tooltip-line);
 }
 .tip__row {
   display: flex;

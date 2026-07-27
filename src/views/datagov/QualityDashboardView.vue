@@ -139,6 +139,8 @@ const fmt = (n: number) => n.toLocaleString('en-US')
 
 <style scoped>
 .qd {
+  /* 质量总分大字 */
+  --qd-score: 38px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -197,7 +199,7 @@ const fmt = (n: number) => n.toLocaleString('en-US')
   justify-content: center;
 }
 .score__value {
-  font-size: 38px;
+  font-size: var(--qd-score);
   font-weight: var(--fw-semibold);
   line-height: 1;
   color: var(--color-neutral-900);

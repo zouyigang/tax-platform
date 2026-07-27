@@ -5,7 +5,7 @@
  * ============================================================ */
 import { ref, shallowRef } from 'vue'
 
-export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
+export type ResourceStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'error' | 'forbidden'
 
 export interface UseResourceOptions<T> {
   /** 判定「空态」:返回 true 时状态置为 empty */
@@ -33,7 +33,8 @@ export function useResource<T>(fetcher: () => Promise<T>, options: UseResourceOp
       if (current !== seq) return
       // 面向业务人员的文案,不暴露堆栈
       error.value = e instanceof Error ? e.message : '数据加载失败'
-      status.value = 'error'
+      // 无权限与取数失败要分开:前者给「重试」没有意义,重试多少次结果都一样
+      status.value = e instanceof Error && e.name === 'ForbiddenError' ? 'forbidden' : 'error'
     }
   }
 

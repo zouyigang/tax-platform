@@ -234,6 +234,8 @@ function toast(text: string) {
 
 <style scoped>
 .qa {
+  /* 会话头像字号 */
+  --qa-avatar: 15px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -357,7 +359,7 @@ function toast(text: string) {
 .msg__avatar--bot {
   background: var(--color-surface-dark);
   color: var(--color-text-inverse);
-  font-size: 15px;
+  font-size: var(--qa-avatar);
   font-weight: var(--fw-regular);
 }
 .msg__card {

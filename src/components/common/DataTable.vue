@@ -203,6 +203,8 @@ function skeletonWidth(index: number): string {
   overflow: auto;
 }
 .table {
+  /* 列头排序指示器字号 */
+  --table-sort: 10px;
   width: 100%;
   border-collapse: collapse;
   font-size: var(--fs-aux);
@@ -237,7 +239,7 @@ function skeletonWidth(index: number): string {
   color: var(--color-primary);
 }
 .table__sort {
-  font-size: 10px;
+  font-size: var(--table-sort);
   color: var(--color-neutral-400);
   margin-left: 2px;
 }

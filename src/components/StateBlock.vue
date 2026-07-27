@@ -43,6 +43,16 @@ defineEmits<{ (e: 'retry'): void }>()
       <span v-if="emptyHint" class="state__desc">{{ emptyHint }}</span>
     </template>
 
+    <!-- 无权限态:与错误态分开 —— 重试无意义,给的是申请路径而不是重试按钮 -->
+    <template v-else-if="status === 'forbidden'">
+      <span class="state__icon state__icon--forbid" aria-hidden="true">⊘</span>
+      <span class="state__title">无权限查看该数据</span>
+      <span class="state__desc">{{ error || '您的数据权限范围不包含该数据' }}</span>
+      <span class="state__desc state__desc--sub">
+        如确需查看,请联系主管部门在「系统管理 / 数据权限配置」中调整授权范围。
+      </span>
+    </template>
+
     <!-- 错误态 -->
     <template v-else>
       <span class="state__icon state__icon--error" aria-hidden="true">!</span>
@@ -55,6 +65,8 @@ defineEmits<{ (e: 'retry'): void }>()
 
 <style scoped>
 .state {
+  /* 空/错误态图标字号 */
+  --state-icon: 22px;
   flex: 1;
   min-height: 0;
   display: flex;
@@ -88,7 +100,7 @@ defineEmits<{ (e: 'retry'): void }>()
   align-items: center;
   justify-content: center;
   color: var(--color-neutral-400);
-  font-size: 22px;
+  font-size: var(--state-icon);
   line-height: 1;
 }
 .state__icon--error {
@@ -96,6 +108,19 @@ defineEmits<{ (e: 'retry'): void }>()
   border-radius: 50%;
   color: var(--color-danger);
   font-weight: 600;
+}
+/* 无权限:用中性告警色,不用危险红 —— 这不是故障,是权限设计的结果 */
+.state__icon--forbid {
+  border-color: var(--color-status-pending);
+  border-radius: 50%;
+  color: var(--color-status-pending-text);
+  font-weight: 600;
+}
+.state__desc--sub {
+  color: var(--color-neutral-500);
+  max-width: 420px;
+  text-align: center;
+  line-height: 1.6;
 }
 
 .state__title {

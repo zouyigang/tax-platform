@@ -130,6 +130,8 @@ function isLeafActive(key: string) {
 
 <style scoped>
 .sidebar {
+  /* 一级菜单图标字号 */
+  --nav-icon: 15px;
   width: var(--layout-sidebar-w);
   height: 100%;
   flex: none;
@@ -162,7 +164,7 @@ function isLeafActive(key: string) {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--nav-icon);
 }
 .sidebar__title {
   font-size: var(--fs-body);
@@ -233,7 +235,7 @@ function isLeafActive(key: string) {
 }
 .nav-group__caret {
   flex: none;
-  font-size: 15px;
+  font-size: var(--nav-icon);
   line-height: 1;
   color: var(--color-surface-fg-weak);
   transform: rotate(0deg);

@@ -192,6 +192,8 @@ function confirmPromote() {
 
 <style scoped>
 .tv {
+  /* 试跑指标大字 */
+  --tv-metric: 22px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -323,7 +325,7 @@ function confirmPromote() {
   color: var(--color-neutral-600);
 }
 .res__value {
-  font-size: 22px;
+  font-size: var(--tv-metric);
   font-weight: var(--fw-semibold);
   line-height: 1.3;
 }

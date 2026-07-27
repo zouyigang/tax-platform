@@ -408,6 +408,10 @@ function goPage(p: number) {
 
 <style scoped>
 .eff {
+  /* 闭环环节数量大字 */
+  --eff-stage: 30px;
+  /* 表头排序指示器 */
+  --eff-sort: 10px;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -507,7 +511,7 @@ function goPage(p: number) {
   color: var(--color-neutral-400);
 }
 .stage__count {
-  font-size: 30px;
+  font-size: var(--eff-stage);
   font-weight: var(--fw-semibold);
   line-height: 1.3;
   letter-spacing: -0.01em;
@@ -845,7 +849,7 @@ function goPage(p: number) {
   color: var(--color-primary);
 }
 .tbl__icon {
-  font-size: 10px;
+  font-size: var(--eff-sort);
   color: var(--color-neutral-400);
 }
 .tbl__icon--on {
