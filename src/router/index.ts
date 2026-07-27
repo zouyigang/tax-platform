@@ -35,6 +35,8 @@ import NewEnterpriseView from '@/views/taxsource/NewEnterpriseView.vue'
 import DocProcessView from '@/views/app/DocProcessView.vue'
 import DocGenView from '@/views/app/DocGenView.vue'
 import NlQueryView from '@/views/app/NlQueryView.vue'
+import DataPermissionView from '@/views/system/DataPermissionView.vue'
+import AuditLogView from '@/views/system/AuditLogView.vue'
 import TrialView from '@/views/ruleops/TrialView.vue'
 import ThresholdView from '@/views/ruleops/ThresholdView.vue'
 import EffectMonitorView from '@/views/ruleops/EffectMonitorView.vue'
@@ -52,6 +54,8 @@ const DONE_VIEWS: Record<string, Component> = {
   'app-doc-gen': DocGenView,
   'app-doc-process': DocProcessView,
   'app-nl-query': NlQueryView,
+  'system-data-permission': DataPermissionView,
+  'system-audit-log': AuditLogView,
   'model-score': ScoreView,
   'model-graph': GraphView,
   'model-fraud-gang': FraudGangView,

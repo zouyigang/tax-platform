@@ -307,23 +307,13 @@ export const MENU: MenuEntry[] = [
         key: 'system-data-permission',
         title: '数据权限配置',
         path: '/system/data-permission',
-        status: 'placeholder',
-        desc: [
-          '按辖区、行业、税种等维度配置数据行级/列级访问范围。',
-          '实现分级授权与最小可见原则。',
-          '对应需求 10.2 数据权限。',
-        ],
+        status: 'done',
       },
       {
         key: 'system-audit-log',
         title: '操作日志审计',
         path: '/system/audit-log',
-        status: 'placeholder',
-        desc: [
-          '记录并检索用户的登录、查询、导出、处置等关键操作。',
-          '支持敏感行为审计与合规追溯。',
-          '对应需求 10.2 日志审计。',
-        ],
+        status: 'done',
       },
       {
         key: 'system-params',

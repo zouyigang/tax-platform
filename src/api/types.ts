@@ -3699,6 +3699,240 @@ export interface AppApi {
 }
 
 /* ========================================================================
+ * 十四、系统管理（System）· 数据权限配置 / 操作日志审计
+ * ------------------------------------------------------------------------
+ * 参照《需求文档》第十章合规要求。
+ * 数据权限不是一个开关,而是三层叠加:能看哪些机构(组织维度)、
+ * 机构内能看哪些户(行级规则)、每户能看到哪些字段(字段级脱敏)。
+ * 三层缺一不可 —— 只控机构会导致越权看到同级全部纳税人,
+ * 只控行级又挡不住敏感字段外泄。
+ * 日志审计的重点是异常行为检测,不是流水账:先看告警,再回溯日志。
+ * ====================================================================== */
+
+/** 权限主体类型:角色 / 用户 */
+export type PermSubjectType = 'role' | 'user'
+
+/** 权限配置主体 */
+export interface PermSubject {
+  /** 主体 id */
+  id: string
+  /** 主体名称 */
+  name: string
+  /** 主体类型 */
+  type: PermSubjectType
+  /** 说明(角色职责 / 用户所属单位) */
+  desc: string
+  /** 关联人数(角色主体有效) */
+  userCount: number
+}
+
+/** 组织层级:市局 / 区县局 / 分局 / 税务所 */
+export type OrgLevel = 'city' | 'district' | 'branch' | 'office'
+
+/** 组织节点(树) */
+export interface OrgNode {
+  /** 机构编码 */
+  code: string
+  /** 机构名称 */
+  name: string
+  /** 层级 */
+  level: OrgLevel
+  /** 下级机构 */
+  children: OrgNode[]
+}
+
+/** 组织范围模式:仅本级 / 本级及下级 */
+export type OrgScopeMode = 'self' | 'selfAndBelow'
+
+/** 行级规则的可配置字段 */
+export type RowRuleField = 'industry' | 'scale' | 'riskLevel' | 'manage'
+
+/** 行级规则条件 */
+export interface RowRuleCondition {
+  /** 条件 id(前端增删用) */
+  id: string
+  /** 条件字段 */
+  field: RowRuleField
+  /** 运算符:包含 / 不包含 */
+  op: 'in' | 'notIn'
+  /** 取值集合 */
+  values: string[]
+}
+
+/** 行级规则字段的可选值 */
+export interface RowRuleOption {
+  /** 字段键 */
+  field: RowRuleField
+  /** 字段名 */
+  label: string
+  /** 字段说明 */
+  desc: string
+  /** 可选值 */
+  options: FilterOption[]
+}
+
+/** 行级规则试算结果 */
+export interface RowRuleEstimate {
+  /** 当前配置可访问的纳税人户数 */
+  count: number
+  /** 全市纳税人总数(用于给出占比) */
+  total: number
+  /** 试算说明(如命中哪几条条件) */
+  note: string
+}
+
+/** 字段脱敏档位:完全隐藏 / 掩码显示 / 明文显示 */
+export type MaskLevel = 'hidden' | 'masked' | 'plain'
+
+/** 敏感字段脱敏配置行 */
+export interface FieldMaskRow {
+  /** 字段键 */
+  key: string
+  /** 字段名 */
+  name: string
+  /** 所属数据域 */
+  category: string
+  /** 明文示例 */
+  plainSample: string
+  /** 掩码示例 */
+  maskedSample: string
+  /** 当前档位 */
+  level: MaskLevel
+  /** 明文授权理由(level='plain' 时必填) */
+  reason: string
+  /** 法规依据 / 敏感说明 */
+  basis: string
+}
+
+/** 数据权限配置(某主体的三层权限) */
+export interface DataPermConfig {
+  /** 配置主体 */
+  subject: PermSubject
+  /** 最小必要原则说明(引《需求文档》10.1) */
+  principle: string
+  /** 组织树 */
+  orgTree: OrgNode[]
+  /** 已勾选的机构编码 */
+  orgSelected: string[]
+  /** 组织范围模式 */
+  orgMode: OrgScopeMode
+  /** 行级规则条件 */
+  rowRules: RowRuleCondition[]
+  /** 行级规则可选字段与取值 */
+  rowRuleOptions: RowRuleOption[]
+  /** 字段级脱敏配置 */
+  fields: FieldMaskRow[]
+  /** 最后更新时间 */
+  updatedAt: string
+  /** 最后更新人 */
+  updatedBy: string
+}
+
+/* ---- 操作日志审计 ---- */
+
+/** 异常告警类型 */
+export type AuditAlertType = 'highFreq' | 'offHours' | 'outOfScope' | 'bulkExport'
+
+/** 异常告警分组 */
+export interface AuditAlertGroup {
+  /** 告警类型 */
+  type: AuditAlertType
+  /** 类型名称 */
+  label: string
+  /** 判定口径 */
+  desc: string
+  /** 触发次数 */
+  count: number
+  /** 涉及用户 */
+  users: string[]
+  /** 紧要程度 */
+  level: RiskLevel
+}
+
+/** 操作类型 */
+export type AuditOpType = 'login' | 'query' | 'viewPlain' | 'export' | 'permChange' | 'config' | 'dispatch'
+
+/** 操作结果 */
+export type AuditResult = 'success' | 'fail' | 'denied'
+
+/** 操作日志行 */
+export interface AuditLogRow {
+  /** 日志 id */
+  id: string
+  /** 操作时间 */
+  time: string
+  /** 操作人 */
+  operator: string
+  /** 所属单位 */
+  dept: string
+  /** 操作类型 */
+  opType: AuditOpType
+  /** 操作类型名称 */
+  opTypeLabel: string
+  /** 操作对象 */
+  target: string
+  /** 来源 IP */
+  ip: string
+  /** 操作结果 */
+  result: AuditResult
+  /** 是否敏感操作(查看明文 / 批量导出 / 权限变更) */
+  sensitive: boolean
+  /** 敏感原因说明 */
+  sensitiveNote: string
+  /** 命中的告警类型;为空表示未触发告警 */
+  alertType: AuditAlertType | null
+}
+
+/** 日志查询参数 */
+export interface AuditQuery {
+  /** 操作人 / 操作对象关键字 */
+  keyword: string
+  /** 操作类型;'all' 不限 */
+  opType: string
+  /** 告警类型过滤;'all' 不限 */
+  alertType: string
+  /** 仅看敏感操作 */
+  sensitiveOnly: boolean
+  /** 起始日期(含) */
+  dateFrom: string
+  /** 截止日期(含) */
+  dateTo: string
+  /** 页码,从 1 开始 */
+  page: number
+  /** 每页条数 */
+  pageSize: number
+}
+
+/** 审计概览 */
+export interface AuditOverview {
+  /** 数据更新时间 */
+  updatedAt: string
+  /** 四项概览指标 */
+  kpis: Array<MetricItem & { accent: KpiAccent }>
+  /** 当前异常告警分组 */
+  alerts: AuditAlertGroup[]
+  /** 操作类型选项(含「全部类型」) */
+  opTypes: FilterOption[]
+  /** 默认查询起止日期 */
+  defaultFrom: string
+  defaultTo: string
+}
+
+/** 系统管理接口分组 */
+export interface SystemApi {
+  /** 数据权限·可配置的主体(角色与用户) */
+  getPermSubjects(): Promise<PermSubject[]>
+  /** 数据权限·某主体的三层权限配置 */
+  getDataPermConfig(subjectId: string): Promise<DataPermConfig>
+  /** 数据权限·行级规则试算可访问户数(配置过程中实时调用,不落库) */
+  estimateRowRules(subjectId: string, rules: RowRuleCondition[]): Promise<RowRuleEstimate>
+  /** 日志审计·概览与告警 */
+  getAuditOverview(): Promise<AuditOverview>
+  /** 日志审计·日志列表(敏感操作置顶) */
+  getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>>
+}
+
+/* ========================================================================
  * 顶层 API 客户端
  * ====================================================================== */
 export interface ApiClient {
@@ -3718,8 +3952,10 @@ export interface ApiClient {
   model: ModelApi
   /** 税源监控 · 重点税源监控 / 收入预测 / 新办企业评估 */
   taxsource: TaxSourceApi
-  /** 智能应用 · 资料智能处理 */
+  /** 智能应用 · 文书生成 / 资料处理 / 自然语言取数 */
   app: AppApi
+  /** 系统管理 · 数据权限配置 / 操作日志审计 */
+  system: SystemApi
   /** 决策分析 · 收入 / 税源 / 成效 / 专题 */
   decision: DecisionApi
   /** 数据治理 · 接入监控 / 质量看板 / 主体识别 */

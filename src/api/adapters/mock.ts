@@ -13,6 +13,12 @@ import type {
   AbnormalRow,
   ApiClient,
   ArchiveDeclare,
+  AuditAlertType,
+  AuditLogRow,
+  AuditOpType,
+  AuditOverview,
+  AuditQuery,
+  AuditResult,
   BenchmarkAttribution,
   BenchmarkBoard,
   BenchmarkPoint,
@@ -57,7 +63,10 @@ import type {
   BackfillStatus,
   DashboardFilters,
   DashboardQuery,
+  DataPermConfig,
   DataSourceMonitor,
+  FieldMaskRow,
+  MaskLevel,
   DispatchBoard,
   DispatchFilters,
   DispatchPreview,
@@ -132,10 +141,14 @@ import type {
   NlColumn,
   NlMetricDictItem,
   NlSession,
+  OrgLevel,
+  OrgNode,
+  OrgScopeMode,
   PotentialDimension,
   ShellFeature,
   TaxSourceTier,
   PagedResult,
+  PermSubject,
   QaSession,
   ForecastBoard,
   RevenueTrend,
@@ -154,6 +167,9 @@ import type {
   ScoreQuery,
   ScoreRow,
   ShapItem,
+  RowRuleCondition,
+  RowRuleEstimate,
+  RowRuleOption,
   SourceContribution,
   TaxAdvice,
   WorkloadRow,
@@ -2527,6 +2543,346 @@ function buildDispatchPreview(input: DispatchStrategyInput): DispatchPreview {
   return { items, unassigned, loadAfter }
 }
 
+/* ==================== 系统管理:数据权限 / 日志审计演示数据 ==================== */
+
+/** 可配置权限的主体 */
+const PERM_SUBJECTS: PermSubject[] = [
+  { id: 'role-admin', name: '系统管理员', type: 'role', desc: '平台运维与参数配置,原则上不授予业务数据明文权限', userCount: 3 },
+  { id: 'role-city-analyst', name: '市局分析岗', type: 'role', desc: '全市口径统计分析,不接触单户敏感字段', userCount: 12 },
+  { id: 'role-district-admin', name: '区县管理员', type: 'role', desc: '本区县范围内的用户与任务管理', userCount: 18 },
+  { id: 'role-source-manager', name: '税源管理员', type: 'role', desc: '管辖范围内纳税人的日常管理与核查', userCount: 96 },
+  { id: 'role-inspector', name: '稽查岗', type: 'role', desc: '案件调查,经审批可查看明文身份信息', userCount: 24 },
+  { id: 'role-leader', name: '领导查询岗', type: 'role', desc: '汇总数据查询,不下钻到单户明细', userCount: 8 },
+  { id: 'user-li', name: '李××(城东区税务局)', type: 'user', desc: '税源管理员 · 工号 320115', userCount: 1 },
+  { id: 'user-zhang', name: '张××(高新区税务局)', type: 'user', desc: '稽查岗 · 工号 320233', userCount: 1 },
+]
+
+/** 组织树:市局 → 区县局 → 分局 → 税务所 */
+const ORG_TREE: OrgNode[] = [
+  {
+    code: 'city',
+    name: '××市税务局',
+    level: 'city',
+    children: Object.keys(DISTRICT_CN).map((code) => ({
+      code,
+      name: `${DISTRICT_CN[code]}税务局`,
+      level: 'district' as OrgLevel,
+      children: [
+        {
+          code: `${code}-b1`,
+          name: '第一税务分局',
+          level: 'branch' as OrgLevel,
+          children: [
+            { code: `${code}-b1-o1`, name: '第一税务所', level: 'office' as OrgLevel, children: [] },
+            { code: `${code}-b1-o2`, name: '第二税务所', level: 'office' as OrgLevel, children: [] },
+          ],
+        },
+        {
+          code: `${code}-b2`,
+          name: '第二税务分局',
+          level: 'branch' as OrgLevel,
+          children: [
+            { code: `${code}-b2-o1`, name: '第三税务所', level: 'office' as OrgLevel, children: [] },
+          ],
+        },
+      ],
+    })),
+  },
+]
+
+/** 行级规则可选字段与取值 */
+const ROW_RULE_OPTIONS: RowRuleOption[] = [
+  {
+    field: 'industry',
+    label: '所属行业',
+    desc: '按纳税人登记的行业门类限定可见范围',
+    options: INDUSTRY_CODES.map((c) => ({ value: c, label: INDUSTRY_CN[c] })),
+  },
+  {
+    field: 'scale',
+    label: '纳税人规模',
+    desc: '按纳税人资格与规模分档限定',
+    options: [
+      { value: 'general', label: '一般纳税人' },
+      { value: 'small', label: '小规模纳税人' },
+      { value: 'key', label: '重点税源户' },
+    ],
+  },
+  {
+    field: 'riskLevel',
+    label: '风险等级',
+    desc: '按当前风险等级限定;低风险户通常无需下放明细权限',
+    options: [
+      { value: 'high', label: '高风险' },
+      { value: 'mid', label: '中风险' },
+      { value: 'low', label: '低风险' },
+    ],
+  },
+  {
+    field: 'manage',
+    label: '管辖关系',
+    desc: '按是否属于本人 / 本机构管辖限定',
+    options: [
+      { value: 'own', label: '本人管辖' },
+      { value: 'dept', label: '本机构管辖' },
+      { value: 'all', label: '不限管辖关系' },
+    ],
+  },
+]
+
+/** 敏感字段清单(脱敏档位的配置对象) */
+const MASK_FIELDS: Array<Omit<FieldMaskRow, 'level' | 'reason'>> = [
+  {
+    key: 'idCard',
+    name: '身份证号',
+    category: '自然人身份信息',
+    plainSample: '330102199003074512',
+    maskedSample: '3301**********4512',
+    basis: '《个人信息保护法》敏感个人信息;查看明文须单独授权并留痕',
+  },
+  {
+    key: 'bankAccount',
+    name: '银行账号',
+    category: '资金信息',
+    plainSample: '6222 0202 0001 2345 678',
+    maskedSample: '6222 **** **** **** 678',
+    basis: '涉及金融账户信息,非资金核查场景不应下放明文',
+  },
+  {
+    key: 'phone',
+    name: '联系电话',
+    category: '自然人身份信息',
+    plainSample: '138 0013 8000',
+    maskedSample: '138 **** 8000',
+    basis: '《个人信息保护法》个人信息;按最小必要原则默认掩码',
+  },
+  {
+    key: 'legalName',
+    name: '法定代表人姓名',
+    category: '登记信息',
+    plainSample: '张伟明',
+    maskedSample: '张××',
+    basis: '与工商公示信息重合度高,但仍属个人信息,按岗位授权',
+  },
+  {
+    key: 'address',
+    name: '具体经营地址',
+    category: '登记信息',
+    plainSample: '城东区工业大道 128 号 3 幢 502 室',
+    maskedSample: '城东区工业大道 ***',
+    basis: '门牌级地址可定位到自然人住所,实地核查岗方可明文',
+  },
+]
+
+/** 不同主体的默认权限配置(体现最小必要原则的差异) */
+const PERM_PRESET: Record<
+  string,
+  { orgSelected: string[]; orgMode: OrgScopeMode; rules: RowRuleCondition[]; levels: Record<string, MaskLevel>; reason: string }
+> = {
+  'role-admin': {
+    orgSelected: ['city'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'manage', op: 'in', values: ['all'] }],
+    // 运维岗不给业务明文:这是最小必要原则最典型的一处体现
+    levels: { idCard: 'hidden', bankAccount: 'hidden', phone: 'hidden', legalName: 'masked', address: 'masked' },
+    reason: '',
+  },
+  'role-city-analyst': {
+    orgSelected: ['city'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'manage', op: 'in', values: ['all'] }],
+    levels: { idCard: 'hidden', bankAccount: 'hidden', phone: 'hidden', legalName: 'masked', address: 'masked' },
+    reason: '',
+  },
+  'role-district-admin': {
+    orgSelected: ['chengdong'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'manage', op: 'in', values: ['dept'] }],
+    levels: { idCard: 'masked', bankAccount: 'hidden', phone: 'masked', legalName: 'plain', address: 'masked' },
+    reason: '区县用户与任务管理需核对法人姓名',
+  },
+  'role-source-manager': {
+    orgSelected: ['chengdong-b1'],
+    orgMode: 'selfAndBelow',
+    rules: [
+      { id: 'r1', field: 'manage', op: 'in', values: ['own'] },
+      { id: 'r2', field: 'riskLevel', op: 'in', values: ['high', 'mid'] },
+    ],
+    levels: { idCard: 'masked', bankAccount: 'hidden', phone: 'plain', legalName: 'plain', address: 'plain' },
+    reason: '日常管理需联系纳税人并开展实地核查',
+  },
+  'role-inspector': {
+    orgSelected: ['city'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'riskLevel', op: 'in', values: ['high'] }],
+    levels: { idCard: 'plain', bankAccount: 'plain', phone: 'plain', legalName: 'plain', address: 'plain' },
+    reason: '稽查立案调查,依《税收征管法》第五十四条调取涉税资料',
+  },
+  'role-leader': {
+    orgSelected: ['city'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'manage', op: 'in', values: ['all'] }],
+    levels: { idCard: 'hidden', bankAccount: 'hidden', phone: 'hidden', legalName: 'hidden', address: 'hidden' },
+    reason: '',
+  },
+  'user-li': {
+    orgSelected: ['chengdong-b1-o1'],
+    orgMode: 'self',
+    rules: [
+      { id: 'r1', field: 'manage', op: 'in', values: ['own'] },
+      { id: 'r2', field: 'industry', op: 'in', values: ['wholesale', 'construction'] },
+    ],
+    levels: { idCard: 'masked', bankAccount: 'hidden', phone: 'plain', legalName: 'plain', address: 'plain' },
+    reason: '管辖户日常联系与实地核查',
+  },
+  'user-zhang': {
+    orgSelected: ['gaoxin'],
+    orgMode: 'selfAndBelow',
+    rules: [{ id: 'r1', field: 'riskLevel', op: 'in', values: ['high', 'mid'] }],
+    levels: { idCard: 'plain', bankAccount: 'masked', phone: 'plain', legalName: 'plain', address: 'plain' },
+    reason: '在办案件 JC2026-0117 调查取证需要',
+  },
+}
+
+/** 按行级规则试算可访问户数(以纳税人名录为样本,按比例外推到全市) */
+function estimateRows(rules: RowRuleCondition[]): RowRuleEstimate {
+  const TOTAL = 12486
+  if (!rules.length) {
+    return { count: TOTAL, total: TOTAL, note: '未配置任何行级规则,当前可访问全部纳税人 —— 不符合最小必要原则,建议至少限定管辖关系' }
+  }
+  const hits = TAXPAYER_DATA.filter((t) => {
+    return rules.every((r) => {
+      let v = ''
+      if (r.field === 'industry') v = t.industryCode
+      else if (r.field === 'scale') v = t.qualification
+      else if (r.field === 'riskLevel') v = t.riskLevel
+      else v = 'own'
+      // 管辖关系无法在名录样本上判定,视为恒真,由说明文案交代
+      if (r.field === 'manage') return true
+      return r.op === 'in' ? r.values.indexOf(v) >= 0 : r.values.indexOf(v) < 0
+    })
+  })
+  const ratio = TAXPAYER_DATA.length ? hits.length / TAXPAYER_DATA.length : 0
+  // 管辖关系条件按经验系数折算:本人管辖约 1.6%、本机构约 12%
+  const manage = rules.filter((r) => r.field === 'manage')[0]
+  const manageFactor = manage
+    ? manage.values.indexOf('own') >= 0
+      ? 0.016
+      : manage.values.indexOf('dept') >= 0
+        ? 0.12
+        : 1
+    : 1
+  const count = Math.max(0, Math.round(TOTAL * ratio * manageFactor))
+  const parts = rules.map((r) => {
+    const opt = ROW_RULE_OPTIONS.filter((o) => o.field === r.field)[0]
+    const names = r.values
+      .map((v) => (opt.options.filter((o) => o.value === v)[0] || { label: v }).label)
+      .join('、')
+    return `${opt.label} ${r.op === 'in' ? '属于' : '不属于'} ${names || '(未选)'}`
+  })
+  return {
+    count,
+    total: TOTAL,
+    note: `命中条件:${parts.join(' 且 ')}${manage ? '(管辖关系按经验系数折算)' : ''}`,
+  }
+}
+
+/* ---- 操作日志审计 ---- */
+
+/** 操作类型元信息 */
+const AUDIT_OP_META: Array<{ type: AuditOpType; label: string; sensitive: boolean }> = [
+  { type: 'login', label: '登录', sensitive: false },
+  { type: 'query', label: '数据查询', sensitive: false },
+  { type: 'viewPlain', label: '查看明文身份信息', sensitive: true },
+  { type: 'export', label: '批量导出', sensitive: true },
+  { type: 'permChange', label: '权限变更', sensitive: true },
+  { type: 'config', label: '参数配置', sensitive: false },
+  { type: 'dispatch', label: '任务派发', sensitive: false },
+]
+
+/** 告警类型元信息 */
+const AUDIT_ALERT_META: Array<{ type: AuditAlertType; label: string; desc: string; level: RiskLevel }> = [
+  { type: 'highFreq', label: '短时间高频查询', desc: '5 分钟内查询纳税人明细 ≥ 30 次', level: 'high' },
+  { type: 'offHours', label: '非工作时间访问', desc: '工作日 21:00—次日 7:00 或休息日登录并查询', level: 'mid' },
+  { type: 'outOfScope', label: '超范围访问尝试', desc: '请求的纳税人不在其数据权限范围内,已被拒绝', level: 'high' },
+  { type: 'bulkExport', label: '大批量导出', desc: '单次导出记录数 ≥ 1000 行', level: 'mid' },
+]
+
+/** 演示用操作人名册 */
+const AUDIT_USERS: Array<{ name: string; dept: string }> = [
+  { name: '李××', dept: '城东区税务局' },
+  { name: '张××', dept: '高新区税务局' },
+  { name: '王××', dept: '城东区税务局' },
+  { name: '陈××', dept: '高新区税务局' },
+  { name: '赵××', dept: '城西区税务局' },
+  { name: '孙××', dept: '市局风险管理科' },
+  { name: '周××', dept: '市局稽查局' },
+  { name: '吴××', dept: '临江县税务局' },
+]
+
+/**
+ * 操作日志
+ * 按「多数常规 + 少数异常」的真实分布构造:告警条目占比约 12%,
+ * 其余为登录、查询、派发等常规操作,避免整页都是红色而失去提示意义。
+ */
+const AUDIT_LOG_DATA: AuditLogRow[] = (() => {
+  const list: AuditLogRow[] = []
+  for (let i = 0; i < 160; i++) {
+    const u = AUDIT_USERS[i % AUDIT_USERS.length]
+    const meta = AUDIT_OP_META[Math.floor(rand(i * 7) * AUDIT_OP_META.length)]
+    // 时间自 2026-07-24 18:00 起逐条回溯
+    const base = new Date('2026-07-24T18:00:00')
+    base.setMinutes(base.getMinutes() - i * 11 - Math.floor(rand(i * 3) * 9))
+    const hh = base.getHours()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const time = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())} ${pad(hh)}:${pad(base.getMinutes())}`
+
+    // 告警判定:各类型按固定间隔命中,保证四类都有样本
+    let alertType: AuditAlertType | null = null
+    if (i % 23 === 4) alertType = 'highFreq'
+    else if (hh >= 21 || hh < 7) alertType = 'offHours'
+    else if (i % 31 === 9) alertType = 'outOfScope'
+    else if (meta.type === 'export' && i % 5 === 0) alertType = 'bulkExport'
+
+    const result: AuditResult = alertType === 'outOfScope' ? 'denied' : i % 37 === 12 ? 'fail' : 'success'
+    const tp = TAXPAYER_DATA[i % TAXPAYER_DATA.length]
+    const target =
+      meta.type === 'login'
+        ? '平台登录'
+        : meta.type === 'export'
+          ? `导出「风险线索池」${alertType === 'bulkExport' ? 1280 + i : 120 + i} 行`
+          : meta.type === 'permChange'
+            ? `修改「${PERM_SUBJECTS[i % PERM_SUBJECTS.length].name}」数据权限`
+            : meta.type === 'config'
+              ? '修改系统参数 · 数据同步时间窗口'
+              : meta.type === 'dispatch'
+                ? `派发线索 ${CLUE_DATA[i % CLUE_DATA.length].id}`
+                : `${tp.name}(${tp.taxpayerId})`
+
+    list.push({
+      id: `LOG2026-${String(90000 + i)}`,
+      time,
+      operator: u.name,
+      dept: u.dept,
+      opType: meta.type,
+      opTypeLabel: meta.label,
+      target,
+      ip: `10.${20 + (i % 6)}.${1 + (i % 200)}.${10 + (i % 240)}`,
+      result,
+      sensitive: meta.sensitive,
+      sensitiveNote: meta.sensitive
+        ? meta.type === 'viewPlain'
+          ? '查看了身份证号明文,已按授权理由留痕'
+          : meta.type === 'export'
+            ? '批量导出纳税人明细,导出内容已归档'
+            : '变更了他人数据权限范围'
+        : '',
+      alertType,
+    })
+  }
+  return list
+})()
+
 /** 判定逻辑表达式 / 数据来源(按比对范式给出模板) */
 const MODEL_LOGIC: Record<ComparisonModel, { logic: string; source: string; threshold: string }> = {
   threshold: { logic: '指标值 > 预警阈值(按行业/规模分档取值)', source: '申报征管数据', threshold: '超过分档上限即命中' },
@@ -4200,6 +4556,104 @@ export const mockClient: ApiClient = {
       })
 
       return delay({ rootName: '城东区某建材经营部', rootId: 'n1', nodes, edges, details })
+    },
+  },
+
+  /* ==================== 系统管理 · 数据权限 / 日志审计 ==================== */
+  system: {
+    getPermSubjects(): Promise<PermSubject[]> {
+      return delay(PERM_SUBJECTS)
+    },
+
+    getDataPermConfig(subjectId: string): Promise<DataPermConfig> {
+      const subject = PERM_SUBJECTS.filter((s) => s.id === subjectId)[0] || PERM_SUBJECTS[0]
+      const preset = PERM_PRESET[subject.id] || PERM_PRESET['role-source-manager']
+      return delay({
+        subject,
+        principle:
+          '依《需求文档》10.1 最小必要原则:数据权限应满足岗位履职的最小范围,不得默认全量开放;' +
+          '明文查看敏感字段须单独授权并说明理由,全程留痕备查。',
+        orgTree: ORG_TREE,
+        orgSelected: preset.orgSelected,
+        orgMode: preset.orgMode,
+        rowRules: preset.rules.map((r) => ({ ...r, values: r.values.slice() })),
+        rowRuleOptions: ROW_RULE_OPTIONS,
+        fields: MASK_FIELDS.map((f) => ({
+          ...f,
+          level: preset.levels[f.key] || 'masked',
+          reason: preset.levels[f.key] === 'plain' ? preset.reason : '',
+        })),
+        updatedAt: '2026-07-20 10:32',
+        updatedBy: '王××(市局信息中心)',
+      })
+    },
+
+    estimateRowRules(_subjectId: string, rules: RowRuleCondition[]): Promise<RowRuleEstimate> {
+      // 配置过程中会频繁调用,延时压到最短
+      return delay(estimateRows(rules), 150)
+    },
+
+    getAuditOverview(): Promise<AuditOverview> {
+      const alertCount = (t: AuditAlertType) => AUDIT_LOG_DATA.filter((l) => l.alertType === t).length
+      const usersOf = (t: AuditAlertType) => {
+        const set: string[] = []
+        AUDIT_LOG_DATA.forEach((l) => {
+          if (l.alertType === t && set.indexOf(l.operator) < 0) set.push(l.operator)
+        })
+        return set
+      }
+      const totalAlerts = AUDIT_LOG_DATA.filter((l) => l.alertType !== null).length
+      const sensitiveQuery = AUDIT_LOG_DATA.filter((l) => l.opType === 'viewPlain').length
+      const exports = AUDIT_LOG_DATA.filter((l) => l.opType === 'export').length
+      return delay({
+        updatedAt: '2026-07-24 18:00',
+        kpis: [
+          { label: '今日操作总量', value: AUDIT_LOG_DATA.length.toLocaleString('en-US'), unit: '次', accent: 'primary' },
+          { label: '敏感数据查询', value: String(sensitiveQuery), unit: '次', accent: 'gold' },
+          { label: '批量导出', value: String(exports), unit: '次', accent: 'teal' },
+          // 告警数不为零时用红色色条,零则转为常规色
+          { label: '异常行为告警', value: String(totalAlerts), unit: '条', accent: totalAlerts > 0 ? 'red' : 'green' },
+        ],
+        alerts: AUDIT_ALERT_META.map((m) => ({
+          type: m.type,
+          label: m.label,
+          desc: m.desc,
+          count: alertCount(m.type),
+          users: usersOf(m.type),
+          level: m.level,
+        })),
+        opTypes: [{ value: 'all', label: '全部类型' }].concat(
+          AUDIT_OP_META.map((m) => ({ value: m.type, label: m.label })),
+        ),
+        defaultFrom: '2026-07-23',
+        defaultTo: '2026-07-24',
+      })
+    },
+
+    getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>> {
+      const kw = query.keyword.trim()
+      const filtered = AUDIT_LOG_DATA.filter((l) => {
+        if (kw && l.operator.indexOf(kw) < 0 && l.target.indexOf(kw) < 0 && l.ip.indexOf(kw) < 0) return false
+        if (query.opType !== 'all' && l.opType !== query.opType) return false
+        if (query.alertType !== 'all' && l.alertType !== query.alertType) return false
+        if (query.sensitiveOnly && !l.sensitive) return false
+        const day = l.time.slice(0, 10)
+        if (query.dateFrom && day < query.dateFrom) return false
+        if (query.dateTo && day > query.dateTo) return false
+        return true
+      })
+      // 敏感操作置顶,其余按时间倒序 —— 审计要先看该看的
+      const sorted = filtered.slice().sort((a, b) => {
+        if (a.sensitive !== b.sensitive) return a.sensitive ? -1 : 1
+        return b.time.localeCompare(a.time)
+      })
+      const start = (query.page - 1) * query.pageSize
+      return delay({
+        items: sorted.slice(start, start + query.pageSize),
+        total: sorted.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
     },
   },
 

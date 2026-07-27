@@ -13,6 +13,9 @@ import type {
   AbnormalRow,
   ApiClient,
   ArchiveDeclare,
+  AuditLogRow,
+  AuditOverview,
+  AuditQuery,
   BenchmarkAttribution,
   BenchmarkBoard,
   BenchmarkScatter,
@@ -29,6 +32,7 @@ import type {
   BackfillRow,
   DashboardFilters,
   DashboardQuery,
+  DataPermConfig,
   DataSourceMonitor,
   DispatchBoard,
   DispatchFilters,
@@ -89,7 +93,10 @@ import type {
   NlAnswer,
   NlSession,
   PagedResult,
+  PermSubject,
   QaSession,
+  RowRuleCondition,
+  RowRuleEstimate,
   ForecastBoard,
   RevenueTrend,
   RiskTaskFunnel,
@@ -282,6 +289,37 @@ export const httpClient: ApiClient = {
   qa: {
     getQaSession(): Promise<QaSession> {
       return get<QaSession>('/qa/session')
+    },
+  },
+
+  system: {
+    getPermSubjects(): Promise<PermSubject[]> {
+      return get<PermSubject[]>('/system/perm/subjects')
+    },
+    getDataPermConfig(subjectId: string): Promise<DataPermConfig> {
+      return get<DataPermConfig>(`/system/perm/${encodeURIComponent(subjectId)}`)
+    },
+    estimateRowRules(subjectId: string, rules: RowRuleCondition[]): Promise<RowRuleEstimate> {
+      // 规则以紧凑串传递:field:op:v1|v2,多条以分号分隔
+      return get<RowRuleEstimate>('/system/perm/estimate', {
+        subjectId,
+        rules: rules.map((r) => `${r.field}:${r.op}:${r.values.join('|')}`).join(';'),
+      })
+    },
+    getAuditOverview(): Promise<AuditOverview> {
+      return get<AuditOverview>('/system/audit/overview')
+    },
+    getAuditLogs(query: AuditQuery): Promise<PagedResult<AuditLogRow>> {
+      return get<PagedResult<AuditLogRow>>('/system/audit/logs', {
+        keyword: query.keyword,
+        opType: query.opType,
+        alertType: query.alertType,
+        sensitiveOnly: query.sensitiveOnly ? 1 : 0,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        page: query.page,
+        pageSize: query.pageSize,
+      })
     },
   },
 
